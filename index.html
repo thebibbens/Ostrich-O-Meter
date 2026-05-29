@@ -37,14 +37,9 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "YOUR_SENDER_ID",
   appId: "YOUR_APP_ID"
 };
-
 const USING_FIREBASE = FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
 let db = null;
-if (USING_FIREBASE) {
-  firebase.initializeApp(FIREBASE_CONFIG);
-  db = firebase.database();
-}
-
+if (USING_FIREBASE) { firebase.initializeApp(FIREBASE_CONFIG); db = firebase.database(); }
 // ─── DATA ──────────────────────────────────────────────────────────────────
 const LABELS = [
   { max: 20, label: "Head high, thriving", color: "#1D9E75" },
