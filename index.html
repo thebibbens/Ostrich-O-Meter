@@ -186,6 +186,7 @@ function App() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [recentRooms, setRecentRooms] = useState([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [roomCreatedBy, setRoomCreatedBy] = useState(null);
   const dbRefRef = useRef(null);
   const today = new Date().toDateString();
 
@@ -232,6 +233,10 @@ function App() {
     const ref = db.ref(`rooms/${roomCode}/members`);
     dbRefRef.current = ref;
     ref.on("value", snap => { setMembers(snap.val() || {}); });
+    // Watch createdBy to detect unclaimed rooms
+    db.ref(`rooms/${roomCode}/createdBy`).on("value", snap => {
+      setRoomCreatedBy(snap.val() || null);
+    });
     // Listen for room deletion
     db.ref(`rooms/${roomCode}`).on("value", snap => {
       if (!snap.val()) {
@@ -299,6 +304,16 @@ function App() {
       if (USING_FIREBASE) attemptWrite(3);
       else setMembers(prev => ({ ...prev, [id]: { id, name: resolvedName, pct: 0, customization: DEFAULT_CUSTOMIZATION } }));
     }
+  };
+
+  const claimAdmin = () => {
+    if (!USING_FIREBASE || !myId) return;
+    db.ref(`rooms/${roomCode}/createdBy`).transaction(existing => {
+      if (existing) return; // already claimed, don't overwrite
+      return myId;
+    }, (err, committed) => {
+      if (committed) { setIsAdmin(true); setRoomCreatedBy(myId); }
+    });
   };
 
   const deleteRoom = () => {
@@ -501,6 +516,7 @@ function App() {
           <button style={s.btnSmall} onClick={copyJoinLink}>{copiedLink?"Link copied!":"Copy join link"}</button>
           <button style={s.btnSmall} onClick={()=>{ localStorage.removeItem("ostrich_session"); setRoomCode(""); setMyId(null); setMembers({}); setRoomName(""); setIsAdmin(false); setRecentRooms(loadRecentRooms()); setView("home"); }}>Switch room</button>
           {isAdmin && <button style={s.btnDanger} onClick={()=>setConfirmDelete(true)}>Delete room</button>}
+          {!isAdmin && !roomCreatedBy && <button style={{...s.btnSmall, color:"#534AB7", borderColor:"#534AB7"}} onClick={claimAdmin}>Claim admin</button>}
         </div>
       </div>
 
