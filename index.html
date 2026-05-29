@@ -31,7 +31,11 @@ const FIREBASE_CONFIG = {
   projectId: "ostrich-o-meter",
   storageBucket: "ostrich-o-meter.firebasestorage.app",
   messagingSenderId: "166015688548",
-  appId: "1:166015688548:web:be84b843d2faa73411a471"};
+  appId: "1:166015688548:web:be84b843d2faa73411a471"
+};
+ const USING_FIREBASE = FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
+let db = null;
+if (USING_FIREBASE) { firebase.initializeApp(FIREBASE_CONFIG); db = firebase.database(); }
 //──────────────────────────────────────────────────────────────────
 const LABELS = [
   { max: 20, label: "Head high, thriving", color: "#1D9E75" },
