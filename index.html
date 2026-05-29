@@ -24,19 +24,28 @@
 
 <script type="text/babel">
 // ─── FIREBASE CONFIG ───────────────────────────────────────────────────────
+// Replace with your own Firebase project config:
+// 1. Go to https://console.firebase.google.com
+// 2. Create a project → Add web app → copy the config below
+// 3. In Firebase console: Realtime Database → Create database → start in test mode
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyB_s7GkdxjOiqflCMJyReQS_0kW4C9c4K4",
-  authDomain: "ostrich-o-meter.firebaseapp.com",
-  databaseURL: "https://ostrich-o-meter-default-rtdb.firebaseio.com",
-  projectId: "ostrich-o-meter",
-  storageBucket: "ostrich-o-meter.firebasestorage.app",
-  messagingSenderId: "166015688548",
-  appId: "1:166015688548:web:be84b843d2faa73411a471"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
- const USING_FIREBASE = FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
+
+const USING_FIREBASE = FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
 let db = null;
-if (USING_FIREBASE) { firebase.initializeApp(FIREBASE_CONFIG); db = firebase.database(); }
-//──────────────────────────────────────────────────────────────────
+if (USING_FIREBASE) {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.database();
+}
+
+// ─── DATA ──────────────────────────────────────────────────────────────────
 const LABELS = [
   { max: 20, label: "Head high, thriving", color: "#1D9E75" },
   { max: 40, label: "Peeking nervously", color: "#639922" },
@@ -176,6 +185,8 @@ const { useState, useEffect, useRef } = React;
 function App() {
   const [view, setView] = useState("home");
   const [roomCode, setRoomCode] = useState("");
+  const [roomName, setRoomName] = useState("");
+  const [newRoomName, setNewRoomName] = useState("");
   const [joinInput, setJoinInput] = useState("");
   const [joinName, setJoinName] = useState("");
   const [myName, setMyName] = useState("");
@@ -185,17 +196,32 @@ function App() {
   const [customTemp, setCustomTemp] = useState(DEFAULT_CUSTOMIZATION);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [recentRooms, setRecentRooms] = useState([]);
   const dbRefRef = useRef(null);
   const today = new Date().toDateString();
 
+  const loadRecentRooms = () => {
+    try { return JSON.parse(localStorage.getItem("ostrich_recent") || "[]"); } catch { return []; }
+  };
+
+  const saveRecentRoom = (code, name, myName) => {
+    try {
+      const rooms = loadRecentRooms().filter(r => r.code !== code);
+      rooms.unshift({ code, name: name || code, myName, date: today });
+      localStorage.setItem("ostrich_recent", JSON.stringify(rooms.slice(0, 6)));
+    } catch {}
+  };
+
   // Load saved session
   useEffect(() => {
+    setRecentRooms(loadRecentRooms());
     try {
       const raw = localStorage.getItem("ostrich_session");
       if (raw) {
         const d = JSON.parse(raw);
         if (d.date === today && d.roomCode && d.myId && d.myName) {
           setRoomCode(d.roomCode); setMyId(d.myId); setMyName(d.myName);
+          setRoomName(d.roomName || d.roomCode);
           setView("room");
         } else localStorage.removeItem("ostrich_session");
       }
@@ -215,37 +241,52 @@ function App() {
     return () => ref.off();
   }, [view, roomCode]);
 
-  const saveSession = (code, id, name) => {
-    try { localStorage.setItem("ostrich_session", JSON.stringify({ roomCode: code, myId: id, myName: name, date: today })); } catch {}
+  const saveSession = (code, id, name, rName) => {
+    try { localStorage.setItem("ostrich_session", JSON.stringify({ roomCode: code, myId: id, myName: name, roomName: rName, date: today })); } catch {}
   };
 
-  const writeMe = (code, id, name, pct, customization) => {
+  const writeMe = (code, id, name, pct, customization, rName) => {
     if (!USING_FIREBASE) {
       setMembers(prev => ({ ...prev, [id]: { id, name, pct, customization } }));
       return;
     }
     db.ref(`rooms/${code}/members/${id}`).set({ id, name, pct, customization });
-    // Set daily reset timestamp if not set
+    db.ref(`rooms/${code}/name`).once("value", snap => { if (!snap.val()) db.ref(`rooms/${code}/name`).set(rName || code); });
     db.ref(`rooms/${code}/date`).transaction(existing => existing || today);
   };
 
   const createRoom = () => {
     if (!myName.trim()) { setError("Enter your name"); return; }
     const code = genCode(), id = `u_${Date.now()}`;
-    setRoomCode(code); setMyId(id);
+    const rName = newRoomName.trim() || code;
+    setRoomCode(code); setMyId(id); setRoomName(rName);
     setView("room"); setError("");
-    saveSession(code, id, myName.trim());
-    writeMe(code, id, myName.trim(), 0, DEFAULT_CUSTOMIZATION);
+    saveSession(code, id, myName.trim(), rName);
+    saveRecentRoom(code, rName, myName.trim());
+    writeMe(code, id, myName.trim(), 0, DEFAULT_CUSTOMIZATION, rName);
   };
 
-  const joinRoom = () => {
-    if (!joinInput.trim()) { setError("Enter a room code"); return; }
-    if (!joinName.trim()) { setError("Enter your name"); return; }
-    const code = joinInput.trim().toUpperCase(), id = `u_${Date.now()}`;
-    setRoomCode(code); setMyId(id); setMyName(joinName.trim());
+  const joinRoom = (code, name) => {
+    const resolvedCode = (code || joinInput).trim().toUpperCase();
+    const resolvedName = (name || joinName).trim();
+    if (!resolvedCode) { setError("Enter a room code"); return; }
+    if (!resolvedName) { setError("Enter your name"); return; }
+    const id = `u_${Date.now()}`;
+    setRoomCode(resolvedCode); setMyId(id); setMyName(resolvedName);
     setView("room"); setError("");
-    saveSession(code, id, joinName.trim());
-    writeMe(code, id, joinName.trim(), 0, DEFAULT_CUSTOMIZATION);
+    // Fetch room name from Firebase if available
+    if (USING_FIREBASE) {
+      db.ref(`rooms/${resolvedCode}/name`).once("value", snap => {
+        const rName = snap.val() || resolvedCode;
+        setRoomName(rName);
+        saveSession(resolvedCode, id, resolvedName, rName);
+        saveRecentRoom(resolvedCode, rName, resolvedName);
+      });
+    } else {
+      saveSession(resolvedCode, id, resolvedName, resolvedCode);
+      saveRecentRoom(resolvedCode, resolvedCode, resolvedName);
+    }
+    writeMe(resolvedCode, id, resolvedName, 0, DEFAULT_CUSTOMIZATION, resolvedCode);
   };
 
   const updatePct = (pct) => {
@@ -308,7 +349,24 @@ function App() {
       </div>
       <h1 style={s.h1}>Ostrich-O-Meter</h1>
       <p style={{color:"#888",fontSize:14,margin:"0 0 2rem"}}>Team check-in, one buried head at a time</p>
-      {!USING_FIREBASE && <p style={{background:"#fff8e1",border:"1px solid #ffe082",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#7a5c00",marginBottom:"1rem",textAlign:"left"}}>⚠️ Firebase not configured — running in local-only mode. Add your Firebase config to enable real-time team sync.</p>}
+      {!USING_FIREBASE && <p style={{background:"#fff8e1",border:"1px solid #ffe082",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#7a5c00",marginBottom:"1rem",textAlign:"left"}}>⚠️ Firebase not configured — running in local-only mode.</p>}
+
+      {recentRooms.length > 0 && (
+        <div style={{marginBottom:"1.5rem",textAlign:"left"}}>
+          <p style={{fontSize:12,color:"#888",marginBottom:8,fontWeight:500}}>Recent rooms</p>
+          {recentRooms.map(r => (
+            <div key={r.code} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",background:"#fff",border:"1px solid #e5e5e5",borderRadius:8,marginBottom:6,cursor:"pointer"}}
+              onClick={()=>{ setMyName(r.myName); setJoinInput(r.code); setView("rejoin"); }}>
+              <div>
+                <p style={{fontSize:14,fontWeight:500,margin:0}}>{r.name}</p>
+                <p style={{fontSize:11,color:"#aaa",margin:0}}>Code: {r.code} · as {r.myName}</p>
+              </div>
+              <span style={{fontSize:18,color:"#ccc"}}>›</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div style={{display:"flex",flexDirection:"column",gap:10,maxWidth:260,margin:"0 auto"}}>
         <button style={s.btnPrimary} onClick={()=>{setView("create");setError("");}}>Create a room</button>
         <button style={s.btnSecondary} onClick={()=>{setView("join");setError("");}}>Join with a code</button>
@@ -316,10 +374,35 @@ function App() {
     </div>
   );
 
+  // Rejoin a recent room (name pre-filled, just confirm)
+  if (view === "rejoin") {
+    const recent = recentRooms.find(r => r.code === joinInput);
+    return (
+      <div style={s.page}>
+        <button style={{...s.btnSmall,marginBottom:20}} onClick={()=>setView("home")}>← Back</button>
+        <h2 style={s.h2}>Rejoin room</h2>
+        <div style={{...s.card,marginBottom:16}}>
+          <p style={{fontWeight:500,margin:"0 0 4px"}}>{recent?.name || joinInput}</p>
+          <p style={{fontSize:12,color:"#aaa",margin:0}}>Code: {joinInput}</p>
+        </div>
+        <div style={{marginBottom:16}}>
+          <label style={s.label}>Your name</label>
+          <input value={myName} onChange={e=>setMyName(e.target.value)} placeholder="e.g. Jordan" onKeyDown={e=>e.key==="Enter"&&joinRoom(joinInput, myName)}/>
+        </div>
+        {error&&<p style={s.error}>{error}</p>}
+        <button style={s.btnPrimary} onClick={()=>joinRoom(joinInput, myName)}>Join room</button>
+      </div>
+    );
+  }
+
   if (view === "create") return (
     <div style={s.page}>
       <button style={{...s.btnSmall,marginBottom:20}} onClick={()=>setView("home")}>← Back</button>
       <h2 style={s.h2}>Create a room</h2>
+      <div style={{marginBottom:12}}>
+        <label style={s.label}>Room name</label>
+        <input value={newRoomName} onChange={e=>setNewRoomName(e.target.value)} placeholder="e.g. Design Team"/>
+      </div>
       <div style={{marginBottom:16}}>
         <label style={s.label}>Your name</label>
         <input value={myName} onChange={e=>setMyName(e.target.value)} placeholder="e.g. Jordan" onKeyDown={e=>e.key==="Enter"&&createRoom()}/>
@@ -385,12 +468,15 @@ function App() {
   return (
     <div style={{padding:"1rem",maxWidth:700,margin:"0 auto"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.5rem",flexWrap:"wrap",gap:10}}>
-        <h1 style={{fontSize:18,fontWeight:600,margin:0}}>Ostrich-O-Meter</h1>
+        <div>
+          <h1 style={{fontSize:18,fontWeight:600,margin:"0 0 2px"}}>{roomName || "Ostrich-O-Meter"}</h1>
+          <p style={{fontSize:11,color:"#aaa",margin:0}}>Ostrich-O-Meter</p>
+        </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:12,color:"#888"}}>Room code:</span>
           <code style={{fontSize:14,fontWeight:600,letterSpacing:2,padding:"3px 10px",background:"#f0f0f0",borderRadius:6,border:"1px solid #e0e0e0"}}>{roomCode}</code>
           <button style={s.btnSmall} onClick={copyCode}>{copied?"Copied!":"Copy"}</button>
-          <button style={s.btnSmall} onClick={()=>{ localStorage.removeItem("ostrich_session"); setRoomCode(""); setMyId(null); setMembers({}); setView("home"); }}>Switch room</button>
+          <button style={s.btnSmall} onClick={()=>{ localStorage.removeItem("ostrich_session"); setRoomCode(""); setMyId(null); setMembers({}); setRoomName(""); setRecentRooms(loadRecentRooms()); setView("home"); }}>Switch room</button>
         </div>
       </div>
 
