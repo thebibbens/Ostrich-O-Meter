@@ -229,7 +229,14 @@ function App() {
     const ref = db.ref(`rooms/${roomCode}/members`);
     dbRefRef.current = ref;
     ref.on("value", snap => { setMembers(snap.val() || {}); });
-    db.ref(`rooms/${roomCode}/createdBy`).on("value", snap => { setRoomCreatedBy(snap.val() || null); });
+    db.ref(`rooms/${roomCode}/createdBy`).on("value", snap => {
+      const creator = snap.val() || null;
+      setRoomCreatedBy(creator);
+      if (creator && creator === myId) {
+        setIsAdmin(true);
+        saveSession(roomCode, myId, myName, roomName, true);
+      }
+    });
     db.ref(`rooms/${roomCode}`).on("value", snap => {
       if (snap.exists() && snap.val() === null) {
         localStorage.removeItem("ostrich_session");
