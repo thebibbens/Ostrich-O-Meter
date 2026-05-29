@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ostrich-O-Meter</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- Firebase for real-time shared state -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; }
+  input[type=range] { width: 100%; accent-color: #534AB7; cursor: pointer; }
+  input[type=text] { padding: 8px 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; width: 100%; outline: none; }
+  input[type=text]:focus { border-color: #534AB7; }
+  button { font-family: inherit; cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+// ─── FIREBASE CONFIG ───────────────────────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB_s7GkdxjOiqflCMJyReQS_0kW4C9c4K4",
+  authDomain: "ostrich-o-meter.firebaseapp.com",
+  databaseURL: "https://ostrich-o-meter-default-rtdb.firebaseio.com",
+  projectId: "ostrich-o-meter",
+  storageBucket: "ostrich-o-meter.firebasestorage.app",
+  messagingSenderId: "166015688548",
+  appId: "1:166015688548:web:be84b843d2faa73411a471"};
+//──────────────────────────────────────────────────────────────────
+const LABELS = [
+  { max: 20, label: "Head high, thriving", color: "#1D9E75" },
+  { max: 40, label: "Peeking nervously", color: "#639922" },
+  { max: 60, label: "Considering the sand", color: "#BA7517" },
+  { max: 80, label: "Going under…", color: "#D85A30" },
+  { max: 100, label: "Fully submerged, send help", color: "#A32D2D" },
+];
+const FEATHER_COLORS = [
+  { name: "Classic black", body: "#2C2C2A", wing: "#e8e8e8", neck: "#8a8a9a", beak: "#E8762A" },
+  { name: "Midnight blue", body: "#1a2a4a", wing: "#b0c4de", neck: "#6a7a9a", beak: "#E8762A" },
+  { name: "Cotton candy", body: "#D4537E", wing: "#fce4ec", neck: "#f8bbd0", beak: "#ff9999" },
+  { name: "Sky blue", body: "#378ADD", wing: "#e3f2fd", neck: "#90caf9", beak: "#E8762A" },
+  { name: "Lavender", body: "#7F77DD", wing: "#ede7f6", neck: "#b39ddb", beak: "#E8762A" },
+  { name: "Sage green", body: "#3B6D11", wing: "#dcedc8", neck: "#a5d6a7", beak: "#E8762A" },
+];
+const EYE_COLORS = [
+  { name: "Blue", color: "#4FC3F7" },
+  { name: "Brown", color: "#8D5524" },
+  { name: "Green", color: "#388E3C" },
+  { name: "Amber", color: "#F9A825" },
+  { name: "Violet", color: "#7B1FA2" },
+  { name: "Gray", color: "#78909C" },
+];
+const ACCESSORIES = [
+  { name: "None", value: "none" },
+  { name: "Top hat", value: "tophat" },
+  { name: "Sunglasses", value: "sunglasses" },
+  { name: "Party hat", value: "partyhat" },
+  { name: "Crown", value: "crown" },
+  { name: "Bow tie", value: "bowtie" },
+];
+const LEG_STYLES = [
+  { name: "Normal", value: "normal" },
+  { name: "Chunky", value: "chunky" },
+  { name: "Long", value: "long" },
+];
+const SIZE_OPTIONS = [
+  { name: "Petite", scale: 0.8 },
+  { name: "Normal", scale: 1.0 },
+  { name: "Tall", scale: 1.2 },
+];
+const DEFAULT_CUSTOMIZATION = { feather: 0, eye: 0, accessory: "none", legStyle: "normal", size: 1 };
+
+function getLabel(pct) { return LABELS.find(l => pct <= l.max) || LABELS[LABELS.length - 1]; }
+function genCode() { return Math.random().toString(36).substring(2, 8).toUpperCase(); }
+
+// ─── OSTRICH SVG ───────────────────────────────────────────────────────────
+function OstrichSVG({ pct, feather, eyeColor, accessory, legStyle, size }) {
+  const sc = size, buried = pct / 100, W = 120, groundY = 170 * sc;
+  const bx = 58*sc, by = 120*sc, brx = 34*sc, bry = 30*sc;
+  const neckBaseX = bx - 10*sc, neckBaseY = by - bry + 4*sc;
+  const neckLen = 60*sc;
+  const angleStart = -80*(Math.PI/180), angleEnd = -200*(Math.PI/180);
+  const neckAngle = angleStart + buried*(angleEnd - angleStart);
+  const neckTipX = neckBaseX + Math.cos(neckAngle)*neckLen;
+  const neckTipY = neckBaseY + Math.sin(neckAngle)*neckLen;
+  const headR = 16*sc;
+  const headX = neckTipX + Math.cos(neckAngle)*headR*0.5;
+  const headY = neckTipY + Math.sin(neckAngle)*headR*0.5;
+  const headBuried = headY + headR*0.5 > groundY;
+  const neckW = 9*sc, perp = neckAngle + Math.PI/2;
+  const nx1=neckBaseX+Math.cos(perp)*neckW, ny1=neckBaseY+Math.sin(perp)*neckW;
+  const nx2=neckBaseX-Math.cos(perp)*neckW, ny2=neckBaseY-Math.sin(perp)*neckW;
+  const nx3=neckTipX-Math.cos(perp)*(neckW*0.7), ny3=neckTipY-Math.sin(perp)*(neckW*0.7);
+  const nx4=neckTipX+Math.cos(perp)*(neckW*0.7), ny4=neckTipY+Math.sin(perp)*(neckW*0.7);
+  const patchX=neckBaseX+Math.cos(neckAngle)*10*sc, patchY=neckBaseY+Math.sin(neckAngle)*10*sc;
+  const ndx=Math.cos(neckAngle), ndy=Math.sin(neckAngle);
+  const faceDx=ndy, faceDy=-ndx;
+  const faceAngle=Math.atan2(faceDy,faceDx);
+  const headUpX=0, headUpY=-1;
+  const eyeX=headX+faceDx*headR*0.3+headUpX*headR*0.35;
+  const eyeY=headY+faceDy*headR*0.3+headUpY*headR*0.35;
+  const lashAngle=Math.atan2(headUpY,headUpX);
+  const beakBaseX=headX+faceDx*headR*0.85, beakBaseY=headY+faceDy*headR*0.85;
+  const beakLen=15*sc;
+  const beakTipX=beakBaseX+faceDx*beakLen, beakTipY=beakBaseY+faceDy*beakLen;
+  const beakH=5*sc;
+  const beakB1X=beakBaseX+headUpX*beakH*0.5, beakB1Y=beakBaseY+headUpY*beakH*0.5;
+  const beakB2X=beakBaseX-headUpX*beakH*0.35, beakB2Y=beakBaseY-headUpY*beakH*0.35;
+  const legLen=legStyle==="long"?52*sc:40*sc, legW=legStyle==="chunky"?5*sc:3.5*sc;
+  const leg1X=bx-8*sc, leg2X=bx+6*sc, legTopY=by+bry-4*sc;
+  const leg1BotY=legTopY+legLen, leg2BotY=legTopY+legLen*0.92;
+  const tailX=bx+brx-4*sc, tailY=by-6*sc;
+  const wingHX=bx+8*sc, wingHY=by-8*sc;
+  const sandDepth=Math.max(0,(buried-0.25)/0.75)*28*sc;
+  const holeVisible=buried>0.25;
+  const svgH=Math.max(leg1BotY+18, groundY+18);
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${W*sc} ${svgH}`} style={{overflow:"visible",display:"block"}}>
+      <ellipse cx={bx} cy={groundY+4} rx={42*sc} ry={7*sc} fill="#c8a96e" opacity="0.3"/>
+      <rect x={0} y={groundY} width={W*sc} height={14*sc} fill="#c8a96e" opacity="0.18" rx={3}/>
+      {[0,1,2].map(i=><ellipse key={i} cx={tailX+i*4*sc} cy={tailY-i*3*sc} rx={12*sc} ry={7*sc} fill={feather.wing} transform={`rotate(${-30+i*15},${tailX+i*4*sc},${tailY-i*3*sc})`} opacity={0.95-i*0.1}/>)}
+      {[0,1,2].map(i=><ellipse key={i} cx={tailX+i*4*sc+Math.cos((-30+i*15)*Math.PI/180)*8*sc} cy={tailY-i*3*sc+Math.sin((-30+i*15)*Math.PI/180)*3*sc} rx={5*sc} ry={3.5*sc} fill={feather.body} transform={`rotate(${-30+i*15},${tailX+i*4*sc},${tailY-i*3*sc})`} opacity={0.4}/>)}
+      <line x1={leg1X} y1={legTopY} x2={leg1X-3*sc} y2={leg1BotY} stroke="#E88070" strokeWidth={legW} strokeLinecap="round"/>
+      <line x1={leg2X} y1={legTopY} x2={leg2X+2*sc} y2={leg2BotY} stroke="#E88070" strokeWidth={legW} strokeLinecap="round"/>
+      {[[-10*sc,4*sc],[-3*sc,6*sc],[4*sc,5*sc]].map(([dx,dy],i)=><line key={i} x1={leg1X-3*sc} y1={leg1BotY} x2={leg1X-3*sc+dx} y2={leg1BotY+dy} stroke="#E88070" strokeWidth={legW*0.7} strokeLinecap="round"/>)}
+      {[[-6*sc,5*sc],[2*sc,7*sc],[9*sc,4*sc]].map(([dx,dy],i)=><line key={i} x1={leg2X+2*sc} y1={leg2BotY} x2={leg2X+2*sc+dx} y2={leg2BotY+dy} stroke="#E88070" strokeWidth={legW*0.7} strokeLinecap="round"/>)}
+      <ellipse cx={bx} cy={by} rx={brx} ry={bry} fill={feather.body}/>
+      <ellipse cx={bx-8*sc} cy={by-10*sc} rx={14*sc} ry={8*sc} fill="white" opacity="0.08"/>
+      <ellipse cx={wingHX} cy={wingHY} rx={18*sc} ry={10*sc} fill={feather.wing} opacity="0.25" transform={`rotate(-15,${wingHX},${wingHY})`}/>
+      <polygon points={`${nx1},${ny1} ${nx2},${ny2} ${nx3},${ny3} ${nx4},${ny4}`} fill={feather.neck}/>
+      <ellipse cx={(nx1+nx4)/2} cy={(ny1+ny4)/2} rx={neckW*0.4} ry={neckLen*0.3} fill="white" opacity="0.12" transform={`rotate(${neckAngle*180/Math.PI},${(nx1+nx4)/2},${(ny1+ny4)/2})`}/>
+      <ellipse cx={patchX} cy={patchY} rx={8*sc} ry={6*sc} fill={feather.wing} opacity="0.7"/>
+      {!headBuried && (
+        <g>
+          <circle cx={headX} cy={headY} r={headR} fill={feather.neck}/>
+          <ellipse cx={headX-headR*0.2} cy={headY-headR*0.3} rx={headR*0.35} ry={headR*0.25} fill="white" opacity="0.15"/>
+          <polygon points={`${beakB1X},${beakB1Y} ${beakTipX+faceDy*2*sc},${beakTipY-faceDx*2*sc} ${beakB2X},${beakB2Y}`} fill="#c86020"/>
+          <polygon points={`${beakB1X},${beakB1Y} ${beakTipX},${beakTipY} ${beakB2X-headUpX*2*sc},${beakB2Y-headUpY*2*sc}`} fill={feather.beak}/>
+          <line x1={beakBaseX} y1={beakBaseY} x2={beakTipX} y2={beakTipY} stroke="#c86020" strokeWidth={1} opacity="0.5"/>
+          <circle cx={eyeX} cy={eyeY} r={6*sc} fill="white"/>
+          <circle cx={eyeX+0.5*sc} cy={eyeY+0.5*sc} r={4*sc} fill={eyeColor}/>
+          <circle cx={eyeX+0.8*sc} cy={eyeY+0.8*sc} r={2*sc} fill="#1a1a1a"/>
+          <circle cx={eyeX-0.5*sc} cy={eyeY-1*sc} r={1.2*sc} fill="white" opacity="0.9"/>
+          {[-0.4,0,0.4].map((offset,i)=>{
+            const la=lashAngle+offset;
+            const lx1=eyeX+Math.cos(la)*5*sc, ly1=eyeY+Math.sin(la)*5*sc;
+            const lx2=lx1+Math.cos(la-0.3)*5*sc, ly2=ly1+Math.sin(la-0.3)*5*sc;
+            return <line key={i} x1={lx1} y1={ly1} x2={lx2} y2={ly2} stroke="#1a1a1a" strokeWidth={1.2*sc} strokeLinecap="round"/>;
+          })}
+          {accessory==="tophat"&&<g><rect x={headX-11*sc} y={headY-headR-22*sc} width={22*sc} height={18*sc} rx={2} fill="#1a1a1a"/><rect x={headX-15*sc} y={headY-headR-5*sc} width={30*sc} height={5*sc} rx={2} fill="#1a1a1a"/><rect x={headX-10*sc} y={headY-headR-22*sc} width={22*sc} height={3*sc} rx={1} fill="#D4537E" opacity="0.8"/></g>}
+          {accessory==="sunglasses"&&<g><rect x={eyeX-8*sc} y={eyeY-5*sc} width={10*sc} height={8*sc} rx={3} fill="#1a1a1a" opacity="0.85"/><rect x={eyeX+4*sc} y={eyeY-5*sc} width={10*sc} height={8*sc} rx={3} fill="#1a1a1a" opacity="0.85"/><line x1={eyeX+2*sc} y1={eyeY-2*sc} x2={eyeX+4*sc} y2={eyeY-2*sc} stroke="#1a1a1a" strokeWidth={1.5*sc}/><line x1={eyeX-8*sc} y1={eyeY-2*sc} x2={eyeX-12*sc} y2={eyeY} stroke="#1a1a1a" strokeWidth={1.5*sc}/></g>}
+          {accessory==="partyhat"&&<g><polygon points={`${headX-12*sc},${headY-headR+2} ${headX+12*sc},${headY-headR+2} ${headX+2*sc},${headY-headR-26*sc}`} fill="#D4537E"/><polygon points={`${headX-12*sc},${headY-headR+2} ${headX+12*sc},${headY-headR+2} ${headX+2*sc},${headY-headR-26*sc}`} fill="none" stroke="#FAC775" strokeWidth={1} strokeDasharray="3,3"/><circle cx={headX+2*sc} cy={headY-headR-26*sc} r={4*sc} fill="#FAC775"/></g>}
+          {accessory==="crown"&&<g><polygon points={`${headX-13*sc},${headY-headR} ${headX-13*sc},${headY-headR-14*sc} ${headX-6*sc},${headY-headR-8*sc} ${headX},${headY-headR-16*sc} ${headX+6*sc},${headY-headR-8*sc} ${headX+13*sc},${headY-headR-14*sc} ${headX+13*sc},${headY-headR}`} fill="#EF9F27" stroke="#BA7517" strokeWidth={0.5}/>{[-8,0,8].map((dx,i)=><circle key={i} cx={headX+dx*sc} cy={headY-headR-2*sc} r={2.5*sc} fill="#D85A30"/>)}</g>}
+          {accessory==="bowtie"&&<g><polygon points={`${neckBaseX-10*sc},${neckBaseY+6*sc} ${neckBaseX},${neckBaseY+12*sc} ${neckBaseX-10*sc},${neckBaseY+18*sc}`} fill="#D4537E"/><polygon points={`${neckBaseX+10*sc},${neckBaseY+6*sc} ${neckBaseX},${neckBaseY+12*sc} ${neckBaseX+10*sc},${neckBaseY+18*sc}`} fill="#D4537E"/><circle cx={neckBaseX} cy={neckBaseY+12*sc} r={3*sc} fill="#993556"/></g>}
+        </g>
+      )}
+      {holeVisible&&<><ellipse cx={neckTipX} cy={groundY} rx={16*sc*Math.min(1,(buried-0.25)/0.5)} ry={5*sc*Math.min(1,(buried-0.25)/0.5)} fill="#b8945e" opacity="0.9"/>{buried>0.5&&<ellipse cx={neckTipX} cy={groundY+2} rx={18*sc} ry={sandDepth*0.5} fill="#c8a96e" opacity="0.85"/>}</> }
+    </svg>
+  );
+}
+
+// ─── APP ───────────────────────────────────────────────────────────────────
+const { useState, useEffect, useRef } = React;
+
+function App() {
+  const [view, setView] = useState("home");
+  const [roomCode, setRoomCode] = useState("");
+  const [joinInput, setJoinInput] = useState("");
+  const [joinName, setJoinName] = useState("");
+  const [myName, setMyName] = useState("");
+  const [members, setMembers] = useState({});
+  const [myId, setMyId] = useState(null);
+  const [customizing, setCustomizing] = useState(null);
+  const [customTemp, setCustomTemp] = useState(DEFAULT_CUSTOMIZATION);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const dbRefRef = useRef(null);
+  const today = new Date().toDateString();
+
+  // Load saved session
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("ostrich_session");
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d.date === today && d.roomCode && d.myId && d.myName) {
+          setRoomCode(d.roomCode); setMyId(d.myId); setMyName(d.myName);
+          setView("room");
+        } else localStorage.removeItem("ostrich_session");
+      }
+    } catch {}
+  }, []);
+
+  // Subscribe to Firebase room when in room view
+  useEffect(() => {
+    if (view !== "room" || !roomCode) return;
+    if (!USING_FIREBASE) return;
+    if (dbRefRef.current) dbRefRef.current.off();
+    const ref = db.ref(`rooms/${roomCode}/members`);
+    dbRefRef.current = ref;
+    ref.on("value", snap => {
+      setMembers(snap.val() || {});
+    });
+    return () => ref.off();
+  }, [view, roomCode]);
+
+  const saveSession = (code, id, name) => {
+    try { localStorage.setItem("ostrich_session", JSON.stringify({ roomCode: code, myId: id, myName: name, date: today })); } catch {}
+  };
+
+  const writeMe = (code, id, name, pct, customization) => {
+    if (!USING_FIREBASE) {
+      setMembers(prev => ({ ...prev, [id]: { id, name, pct, customization } }));
+      return;
+    }
+    db.ref(`rooms/${code}/members/${id}`).set({ id, name, pct, customization });
+    // Set daily reset timestamp if not set
+    db.ref(`rooms/${code}/date`).transaction(existing => existing || today);
+  };
+
+  const createRoom = () => {
+    if (!myName.trim()) { setError("Enter your name"); return; }
+    const code = genCode(), id = `u_${Date.now()}`;
+    setRoomCode(code); setMyId(id);
+    setView("room"); setError("");
+    saveSession(code, id, myName.trim());
+    writeMe(code, id, myName.trim(), 0, DEFAULT_CUSTOMIZATION);
+  };
+
+  const joinRoom = () => {
+    if (!joinInput.trim()) { setError("Enter a room code"); return; }
+    if (!joinName.trim()) { setError("Enter your name"); return; }
+    const code = joinInput.trim().toUpperCase(), id = `u_${Date.now()}`;
+    setRoomCode(code); setMyId(id); setMyName(joinName.trim());
+    setView("room"); setError("");
+    saveSession(code, id, joinName.trim());
+    writeMe(code, id, joinName.trim(), 0, DEFAULT_CUSTOMIZATION);
+  };
+
+  const updatePct = (pct) => {
+    if (!myId) return;
+    const me = members[myId];
+    if (!me) return;
+    const updated = { ...me, pct };
+    if (!USING_FIREBASE) { setMembers(prev => ({ ...prev, [myId]: updated })); return; }
+    db.ref(`rooms/${roomCode}/members/${myId}/pct`).set(pct);
+  };
+
+  const saveCustomize = () => {
+    if (!myId) return;
+    const me = members[myId];
+    if (!me) return;
+    if (!USING_FIREBASE) {
+      setMembers(prev => ({ ...prev, [myId]: { ...me, customization: customTemp } }));
+    } else {
+      db.ref(`rooms/${roomCode}/members/${myId}/customization`).set(customTemp);
+    }
+    setCustomizing(null);
+  };
+
+  const removeMember = (id) => {
+    if (id === myId) {
+      if (USING_FIREBASE) db.ref(`rooms/${roomCode}/members/${myId}`).remove();
+      localStorage.removeItem("ostrich_session");
+      setMembers({}); setMyId(null); setRoomCode(""); setView("home");
+      return;
+    }
+    if (USING_FIREBASE) db.ref(`rooms/${roomCode}/members/${id}`).remove();
+    else setMembers(prev => { const n = {...prev}; delete n[id]; return n; });
+  };
+
+  const copyCode = () => {
+    try { navigator.clipboard.writeText(roomCode); } catch {}
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
+  };
+
+  const memberList = Object.values(members);
+  const me = members[myId];
+  const myLabel = me ? getLabel(me.pct) : null;
+
+  const s = {
+    page: { padding: "2rem 1rem", maxWidth: 480, margin: "0 auto" },
+    card: { background: "#fff", borderRadius: 12, border: "1px solid #e5e5e5", padding: "1rem 1.25rem", marginBottom: "1rem" },
+    h1: { fontSize: 22, fontWeight: 600, margin: "0 0 6px" },
+    h2: { fontSize: 18, fontWeight: 600, margin: "0 0 1.5rem" },
+    label: { fontSize: 13, color: "#666", display: "block", marginBottom: 6 },
+    btnPrimary: { padding: "9px 20px", borderRadius: 8, border: "none", background: "#534AB7", color: "#fff", fontSize: 14, fontWeight: 500, cursor: "pointer", width: "100%" },
+    btnSecondary: { padding: "9px 20px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#333", fontSize: 14, fontWeight: 500, cursor: "pointer", width: "100%" },
+    btnSmall: { padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", color: "#333", fontSize: 12, cursor: "pointer" },
+    error: { color: "#c0392b", fontSize: 13, marginBottom: 12 },
+  };
+
+  if (view === "home") return (
+    <div style={{...s.page, textAlign:"center"}}>
+      <div style={{width:130,margin:"0 auto 8px"}}>
+        <OstrichSVG pct={0} feather={FEATHER_COLORS[0]} eyeColor={EYE_COLORS[0].color} accessory="none" legStyle="normal" size={1}/>
+      </div>
+      <h1 style={s.h1}>Ostrich-O-Meter</h1>
+      <p style={{color:"#888",fontSize:14,margin:"0 0 2rem"}}>Team check-in, one buried head at a time</p>
+      {!USING_FIREBASE && <p style={{background:"#fff8e1",border:"1px solid #ffe082",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#7a5c00",marginBottom:"1rem",textAlign:"left"}}>⚠️ Firebase not configured — running in local-only mode. Add your Firebase config to enable real-time team sync.</p>}
+      <div style={{display:"flex",flexDirection:"column",gap:10,maxWidth:260,margin:"0 auto"}}>
+        <button style={s.btnPrimary} onClick={()=>{setView("create");setError("");}}>Create a room</button>
+        <button style={s.btnSecondary} onClick={()=>{setView("join");setError("");}}>Join with a code</button>
+      </div>
+    </div>
+  );
+
+  if (view === "create") return (
+    <div style={s.page}>
+      <button style={{...s.btnSmall,marginBottom:20}} onClick={()=>setView("home")}>← Back</button>
+      <h2 style={s.h2}>Create a room</h2>
+      <div style={{marginBottom:16}}>
+        <label style={s.label}>Your name</label>
+        <input value={myName} onChange={e=>setMyName(e.target.value)} placeholder="e.g. Jordan" onKeyDown={e=>e.key==="Enter"&&createRoom()}/>
+      </div>
+      {error&&<p style={s.error}>{error}</p>}
+      <button style={s.btnPrimary} onClick={createRoom}>Create room</button>
+    </div>
+  );
+
+  if (view === "join") return (
+    <div style={s.page}>
+      <button style={{...s.btnSmall,marginBottom:20}} onClick={()=>setView(roomCode?"room":"home")}>← Back</button>
+      <h2 style={s.h2}>Join a room</h2>
+      <div style={{marginBottom:12}}>
+        <label style={s.label}>Room code</label>
+        <input value={joinInput} onChange={e=>setJoinInput(e.target.value)} placeholder="ABC123" style={{textTransform:"uppercase",letterSpacing:3}}/>
+      </div>
+      <div style={{marginBottom:16}}>
+        <label style={s.label}>Your name</label>
+        <input value={joinName} onChange={e=>setJoinName(e.target.value)} placeholder="e.g. Alex" onKeyDown={e=>e.key==="Enter"&&joinRoom()}/>
+      </div>
+      {error&&<p style={s.error}>{error}</p>}
+      <button style={s.btnPrimary} onClick={joinRoom}>Join room</button>
+    </div>
+  );
+
+  if (customizing !== null) {
+    const f = FEATHER_COLORS[customTemp.feather];
+    const e = EYE_COLORS[customTemp.eye];
+    const sz = SIZE_OPTIONS[customTemp.size].scale;
+    const pill = (active) => ({ padding:"4px 10px", borderRadius:6, border: active?"1.5px solid #534AB7":"1px solid #ddd", background: active?"#EEEDFE":"#fff", color: active?"#534AB7":"#333", fontSize:12, cursor:"pointer" });
+    return (
+      <div style={s.page}>
+        <h2 style={{...s.h2,marginBottom:"0.75rem"}}>Customize your ostrich</h2>
+        <div style={{width:130,margin:"0 auto 1.25rem"}}>
+          <OstrichSVG pct={15} feather={f} eyeColor={e.color} accessory={customTemp.accessory} legStyle={customTemp.legStyle} size={sz}/>
+        </div>
+        {[
+          {label:"Feather color", content: FEATHER_COLORS.map((o,i)=>(
+            <button key={i} title={o.name} onClick={()=>setCustomTemp(p=>({...p,feather:i}))} style={{width:30,height:30,borderRadius:"50%",border:customTemp.feather===i?"2.5px solid #1a1a1a":"1px solid #ddd",background:o.body,cursor:"pointer",padding:0}}/>
+          ))},
+          {label:"Eye color", content: EYE_COLORS.map((o,i)=>(
+            <button key={i} title={o.name} onClick={()=>setCustomTemp(p=>({...p,eye:i}))} style={{width:30,height:30,borderRadius:"50%",border:customTemp.eye===i?"2.5px solid #1a1a1a":"1px solid #ddd",background:o.color,cursor:"pointer",padding:0}}/>
+          ))},
+          {label:"Accessory", content: ACCESSORIES.map(o=><button key={o.value} onClick={()=>setCustomTemp(p=>({...p,accessory:o.value}))} style={pill(customTemp.accessory===o.value)}>{o.name}</button>)},
+          {label:"Leg style", content: LEG_STYLES.map(o=><button key={o.value} onClick={()=>setCustomTemp(p=>({...p,legStyle:o.value}))} style={pill(customTemp.legStyle===o.value)}>{o.name}</button>)},
+          {label:"Size", content: SIZE_OPTIONS.map((o,i)=><button key={i} onClick={()=>setCustomTemp(p=>({...p,size:i}))} style={pill(customTemp.size===i)}>{o.name}</button>)},
+        ].map(sec=>(
+          <div key={sec.label} style={{marginBottom:14}}>
+            <p style={s.label}>{sec.label}</p>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{sec.content}</div>
+          </div>
+        ))}
+        <div style={{display:"flex",gap:10,marginTop:20}}>
+          <button style={{...s.btnPrimary,width:"auto",padding:"8px 20px"}} onClick={saveCustomize}>Save</button>
+          <button style={{...s.btnSecondary,width:"auto",padding:"8px 20px"}} onClick={()=>setCustomizing(null)}>Cancel</button>
+        </div>
+      </div>
+    );
+  }
+
+  // Room view
+  return (
+    <div style={{padding:"1rem",maxWidth:700,margin:"0 auto"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.5rem",flexWrap:"wrap",gap:10}}>
+        <h1 style={{fontSize:18,fontWeight:600,margin:0}}>Ostrich-O-Meter</h1>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:12,color:"#888"}}>Room code:</span>
+          <code style={{fontSize:14,fontWeight:600,letterSpacing:2,padding:"3px 10px",background:"#f0f0f0",borderRadius:6,border:"1px solid #e0e0e0"}}>{roomCode}</code>
+          <button style={s.btnSmall} onClick={copyCode}>{copied?"Copied!":"Copy"}</button>
+          <button style={s.btnSmall} onClick={()=>{ localStorage.removeItem("ostrich_session"); setRoomCode(""); setMyId(null); setMembers({}); setView("home"); }}>Switch room</button>
+        </div>
+      </div>
+
+      {me && (
+        <div style={s.card}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+            <div>
+              <p style={{fontSize:13,color:"#888",margin:"0 0 2px"}}>My ostrich percentage</p>
+              <p style={{fontSize:24,fontWeight:600,margin:0,color:myLabel?.color}}>{me.pct}%</p>
+              <p style={{fontSize:12,color:"#888",margin:"2px 0 0",fontStyle:"italic"}}>{myLabel?.label}</p>
+            </div>
+            <button style={s.btnSmall} onClick={()=>{setCustomizing(myId);setCustomTemp({...DEFAULT_CUSTOMIZATION,...me.customization});}}>Customize</button>
+          </div>
+          <input type="range" min={0} max={100} step={1} value={me.pct} onChange={e=>updatePct(Number(e.target.value))}/>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#aaa",marginTop:4}}>
+            <span>Head high</span><span>Fully submerged</span>
+          </div>
+        </div>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:"1.5rem"}}>
+        {memberList.map(member=>{
+          const f=FEATHER_COLORS[member.customization?.feather??0];
+          const e=EYE_COLORS[member.customization?.eye??0];
+          const acc=member.customization?.accessory??"none";
+          const leg=member.customization?.legStyle??"normal";
+          const sz=SIZE_OPTIONS[member.customization?.size??1].scale;
+          const lbl=getLabel(member.pct);
+          const isMe=member.id===myId;
+          return (
+            <div key={member.id} style={{background:"#fff",border:isMe?"2px solid #534AB7":"1px solid #e5e5e5",borderRadius:12,padding:"0.75rem",textAlign:"center",position:"relative"}}>
+              {isMe&&<span style={{position:"absolute",top:6,left:8,fontSize:10,color:"#534AB7",fontWeight:600}}>you</span>}
+              <button onClick={()=>removeMember(member.id)} style={{position:"absolute",top:4,right:6,background:"none",border:"none",cursor:"pointer",fontSize:16,color:"#bbb",padding:2,lineHeight:1}}>×</button>
+              <div style={{height:120,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+                <div style={{width:100}}>
+                  <OstrichSVG pct={member.pct} feather={f} eyeColor={e.color} accessory={acc} legStyle={leg} size={sz*0.85}/>
+                </div>
+              </div>
+              <p style={{fontWeight:600,fontSize:13,margin:"4px 0 2px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{member.name}</p>
+              <p style={{fontSize:18,fontWeight:600,margin:"0 0 2px",color:lbl.color}}>{member.pct}%</p>
+              <p style={{fontSize:10,color:"#999",margin:0,fontStyle:"italic",lineHeight:1.3}}>{lbl.label}</p>
+            </div>
+          );
+        })}
+        <div onClick={()=>setView("join")} style={{border:"1px dashed #ccc",borderRadius:12,padding:"0.75rem",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:200,cursor:"pointer",color:"#bbb",gap:8}}>
+          <span style={{fontSize:28}}>+</span>
+          <p style={{fontSize:12,margin:0,color:"#aaa"}}>Add teammate</p>
+          <p style={{fontSize:10,margin:0,color:"#bbb"}}>Share code: <strong style={{color:"#888",letterSpacing:1}}>{roomCode}</strong></p>
+        </div>
+      </div>
+      <p style={{fontSize:11,color:"#bbb",textAlign:"center"}}>{USING_FIREBASE?"Live sync on":"Local mode"} · Resets daily · {today}</p>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
