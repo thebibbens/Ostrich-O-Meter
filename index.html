@@ -185,7 +185,8 @@ function App() {
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [recentRooms, setRecentRooms] = useState([]);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editingRoomName, setEditingRoomName] = useState(false);
+  const [roomNameDraft, setRoomNameDraft] = useState("");
   const [roomCreatedBy, setRoomCreatedBy] = useState(null);
   const dbRefRef = useRef(null);
   const today = new Date().toDateString();
@@ -314,6 +315,19 @@ function App() {
     }, (err, committed) => {
       if (committed) { setIsAdmin(true); setRoomCreatedBy(myId); }
     });
+  };
+
+  const saveRoomName = () => {
+    const newName = roomNameDraft.trim();
+    if (!newName) { setEditingRoomName(false); return; }
+    setRoomName(newName);
+    setEditingRoomName(false);
+    if (USING_FIREBASE) db.ref(`rooms/${roomCode}/name`).set(newName);
+    try {
+      const updated = loadRecentRooms().map(r => r.code === roomCode ? { ...r, name: newName } : r);
+      localStorage.setItem("ostrich_recent", JSON.stringify(updated));
+    } catch {}
+    saveSession(roomCode, myId, myName, newName, isAdmin);
   };
 
   const deleteRoom = () => {
@@ -506,7 +520,24 @@ function App() {
 
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.5rem",flexWrap:"wrap",gap:10}}>
         <div>
-          <h1 style={{fontSize:18,fontWeight:600,margin:"0 0 2px"}}>{roomName || "Ostrich-O-Meter"}</h1>
+          {editingRoomName ? (
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <input
+                value={roomNameDraft}
+                onChange={e=>setRoomNameDraft(e.target.value)}
+                onKeyDown={e=>{ if(e.key==="Enter") saveRoomName(); if(e.key==="Escape") setEditingRoomName(false); }}
+                style={{fontSize:16,fontWeight:600,padding:"2px 8px",borderRadius:6,border:"1.5px solid #534AB7",width:180}}
+                autoFocus
+              />
+              <button style={{...s.btnSmall,background:"#534AB7",color:"#fff",border:"none"}} onClick={saveRoomName}>Save</button>
+              <button style={s.btnSmall} onClick={()=>setEditingRoomName(false)}>Cancel</button>
+            </div>
+          ) : (
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <h1 style={{fontSize:18,fontWeight:600,margin:"0 0 2px"}}>{roomName || "Ostrich-O-Meter"}</h1>
+              {isAdmin && <button onClick={()=>{ setRoomNameDraft(roomName); setEditingRoomName(true); }} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:"#aaa",padding:0}} title="Edit room name">✏️</button>}
+            </div>
+          )}
           <p style={{fontSize:11,color:"#aaa",margin:0}}>Ostrich-O-Meter {isAdmin && <span style={{color:"#534AB7",fontWeight:500}}>· Admin</span>}</p>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
