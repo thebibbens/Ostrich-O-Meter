@@ -29,7 +29,7 @@
 // 2. Create a project → Add web app → copy the config below
 // 3. In Firebase console: Realtime Database → Create database → start in test mode
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyB_s7GkdxjOiqflCMJyReQS_0kW4C9c4K4",
+apiKey: "AIzaSyB_s7GkdxjOiqflCMJyReQS_0kW4C9c4K4",
 authDomain: "ostrich-o-meter.firebaseapp.com",
 databaseURL: "https://ostrich-o-meter-default-rtdb.firebaseio.com",
 projectId: "ostrich-o-meter",
@@ -37,9 +37,14 @@ storageBucket: "ostrich-o-meter.firebasestorage.app",
 messagingSenderId: "166015688548",
 appId: "1:166015688548:web:be84b843d2faa73411a471"
 };
+
 const USING_FIREBASE = FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
 let db = null;
-if (USING_FIREBASE) { firebase.initializeApp(FIREBASE_CONFIG); db = firebase.database(); }
+if (USING_FIREBASE) {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.database();
+}
+
 // ─── DATA ──────────────────────────────────────────────────────────────────
 const LABELS = [
   { max: 20, label: "Head high, thriving", color: "#1D9E75" },
@@ -199,10 +204,10 @@ function App() {
     try { return JSON.parse(localStorage.getItem("ostrich_recent") || "[]"); } catch { return []; }
   };
 
-  const saveRecentRoom = (code, name, myName) => {
+  const saveRecentRoom = (code, name, myName, myId) => {
     try {
       const rooms = loadRecentRooms().filter(r => r.code !== code);
-      rooms.unshift({ code, name: name || code, myName, date: today });
+      rooms.unshift({ code, name: name || code, myName, myId, date: today });
       localStorage.setItem("ostrich_recent", JSON.stringify(rooms.slice(0, 6)));
     } catch {}
   };
@@ -257,31 +262,33 @@ function App() {
     setRoomCode(code); setMyId(id); setRoomName(rName);
     setView("room"); setError("");
     saveSession(code, id, myName.trim(), rName);
-    saveRecentRoom(code, rName, myName.trim());
+    saveRecentRoom(code, rName, myName.trim(), id);
     writeMe(code, id, myName.trim(), 0, DEFAULT_CUSTOMIZATION, rName);
   };
 
-  const joinRoom = (code, name) => {
+  const joinRoom = (code, name, existingId) => {
     const resolvedCode = (code || joinInput).trim().toUpperCase();
     const resolvedName = (name || joinName).trim();
     if (!resolvedCode) { setError("Enter a room code"); return; }
     if (!resolvedName) { setError("Enter your name"); return; }
-    const id = `u_${Date.now()}`;
+    const id = existingId || `u_${Date.now()}`;
     setRoomCode(resolvedCode); setMyId(id); setMyName(resolvedName);
     setView("room"); setError("");
-    // Fetch room name from Firebase if available
     if (USING_FIREBASE) {
       db.ref(`rooms/${resolvedCode}/name`).once("value", snap => {
         const rName = snap.val() || resolvedCode;
         setRoomName(rName);
         saveSession(resolvedCode, id, resolvedName, rName);
-        saveRecentRoom(resolvedCode, rName, resolvedName);
+        saveRecentRoom(resolvedCode, rName, resolvedName, id);
       });
     } else {
       saveSession(resolvedCode, id, resolvedName, resolvedCode);
-      saveRecentRoom(resolvedCode, resolvedCode, resolvedName);
+      saveRecentRoom(resolvedCode, resolvedCode, resolvedName, id);
     }
-    writeMe(resolvedCode, id, resolvedName, 0, DEFAULT_CUSTOMIZATION, resolvedCode);
+    // Only write if no existingId (new joiner), otherwise just update presence
+    if (!existingId) {
+      writeMe(resolvedCode, id, resolvedName, 0, DEFAULT_CUSTOMIZATION, resolvedCode);
+    }
   };
 
   const updatePct = (pct) => {
@@ -351,7 +358,7 @@ function App() {
           <p style={{fontSize:12,color:"#888",marginBottom:8,fontWeight:500}}>Recent rooms</p>
           {recentRooms.map(r => (
             <div key={r.code} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",background:"#fff",border:"1px solid #e5e5e5",borderRadius:8,marginBottom:6,cursor:"pointer"}}
-              onClick={()=>{ setMyName(r.myName); setJoinInput(r.code); setView("rejoin"); }}>
+              onClick={()=>{ setMyName(r.myName); setJoinInput(r.code); joinRoom(r.code, r.myName, r.myId); }}>
               <div>
                 <p style={{fontSize:14,fontWeight:500,margin:0}}>{r.name}</p>
                 <p style={{fontSize:11,color:"#aaa",margin:0}}>Code: {r.code} · as {r.myName}</p>
