@@ -70,6 +70,11 @@ const ACCESSORIES = [
   { name: "Party hat", value: "partyhat" },
   { name: "Crown", value: "crown" },
   { name: "Bow tie", value: "bowtie" },
+  { name: "Lei", value: "lei" },
+  { name: "Coconut bra", value: "coconutbra" },
+  { name: "Wide brim hat", value: "widebrimhat" },
+  { name: "Flip flops", value: "flipflops" },
+  { name: "Snorkel", value: "snorkel" },
 ];
 const LEG_STYLES = [
   { name: "Normal", value: "normal" },
@@ -167,6 +172,61 @@ function OstrichSVG({ pct, feather, eyeColor, accessory, legStyle, size }) {
           {accessory==="partyhat"&&<g><polygon points={`${headX-12*sc},${headY-headR+2} ${headX+12*sc},${headY-headR+2} ${headX+2*sc},${headY-headR-26*sc}`} fill="#D4537E"/><polygon points={`${headX-12*sc},${headY-headR+2} ${headX+12*sc},${headY-headR+2} ${headX+2*sc},${headY-headR-26*sc}`} fill="none" stroke="#FAC775" strokeWidth={1} strokeDasharray="3,3"/><circle cx={headX+2*sc} cy={headY-headR-26*sc} r={4*sc} fill="#FAC775"/></g>}
           {accessory==="crown"&&<g><polygon points={`${headX-13*sc},${headY-headR} ${headX-13*sc},${headY-headR-14*sc} ${headX-6*sc},${headY-headR-8*sc} ${headX},${headY-headR-16*sc} ${headX+6*sc},${headY-headR-8*sc} ${headX+13*sc},${headY-headR-14*sc} ${headX+13*sc},${headY-headR}`} fill="#EF9F27" stroke="#BA7517" strokeWidth={0.5}/>{[-8,0,8].map((dx,i)=><circle key={i} cx={headX+dx*sc} cy={headY-headR-2*sc} r={2.5*sc} fill="#D85A30"/>)}</g>}
           {accessory==="bowtie"&&<g><polygon points={`${neckBaseX-10*sc},${neckBaseY+6*sc} ${neckBaseX},${neckBaseY+12*sc} ${neckBaseX-10*sc},${neckBaseY+18*sc}`} fill="#D4537E"/><polygon points={`${neckBaseX+10*sc},${neckBaseY+6*sc} ${neckBaseX},${neckBaseY+12*sc} ${neckBaseX+10*sc},${neckBaseY+18*sc}`} fill="#D4537E"/><circle cx={neckBaseX} cy={neckBaseY+12*sc} r={3*sc} fill="#993556"/></g>}
+
+          {/* Lei — colorful flowers around the neck base */}
+          {accessory==="lei"&&<g>
+            {[0,1,2,3,4,5,6,7].map(i=>{
+              const a=(i/8)*Math.PI*2;
+              const lx=neckBaseX+Math.cos(a)*12*sc, ly=neckBaseY+8*sc+Math.sin(a)*5*sc;
+              const colors=["#FF6B6B","#FFD93D","#FF8E53","#C77DFF","#FF6B9D","#4ECDC4","#FF6B6B","#FFD93D"];
+              return <g key={i}><circle cx={lx} cy={ly} r={4*sc} fill={colors[i]} opacity="0.9"/><circle cx={lx} cy={ly} r={1.5*sc} fill="#fff" opacity="0.7"/></g>;
+            })}
+            <ellipse cx={neckBaseX} cy={neckBaseY+8*sc} rx={12*sc} ry={5*sc} fill="none" stroke="#2d8a4e" strokeWidth={2*sc} opacity="0.6"/>
+          </g>}
+
+          {/* Coconut bra — two coconut halves on body */}
+          {accessory==="coconutbra"&&<g>
+            <ellipse cx={bx-10*sc} cy={by-8*sc} rx={10*sc} ry={8*sc} fill="#8B6343"/>
+            <ellipse cx={bx+10*sc} cy={by-8*sc} rx={10*sc} ry={8*sc} fill="#8B6343"/>
+            <ellipse cx={bx-10*sc} cy={by-8*sc} rx={8*sc} ry={6*sc} fill="#6B4A2A"/>
+            <ellipse cx={bx+10*sc} cy={by-8*sc} rx={8*sc} ry={6*sc} fill="#6B4A2A"/>
+            {/* Straps */}
+            <line x1={bx-10*sc} y1={by-14*sc} x2={neckBaseX-4*sc} y2={neckBaseY+10*sc} stroke="#8B6343" strokeWidth={2*sc}/>
+            <line x1={bx+10*sc} y1={by-14*sc} x2={neckBaseX+4*sc} y2={neckBaseY+10*sc} stroke="#8B6343" strokeWidth={2*sc}/>
+          </g>}
+
+          {/* Wide brim hat — big floppy straw hat */}
+          {accessory==="widebrimhat"&&<g>
+            {/* Wide brim */}
+            <ellipse cx={headX+2*sc} cy={headY-headR+2*sc} rx={28*sc} ry={7*sc} fill="#D4A853"/>
+            <ellipse cx={headX+2*sc} cy={headY-headR+2*sc} rx={28*sc} ry={7*sc} fill="none" stroke="#B8832A" strokeWidth={1*sc}/>
+            {/* Crown */}
+            <ellipse cx={headX+2*sc} cy={headY-headR-8*sc} rx={14*sc} ry={11*sc} fill="#D4A853"/>
+            <ellipse cx={headX+2*sc} cy={headY-headR+2*sc} rx={14*sc} ry={5*sc} fill="#C49040"/>
+            {/* Hat band */}
+            <ellipse cx={headX+2*sc} cy={headY-headR-2*sc} rx={14*sc} ry={4*sc} fill="none" stroke="#E8762A" strokeWidth={3*sc}/>
+            {/* Straw texture lines */}
+            {[-1,0,1].map(i=><line key={i} x1={headX+2*sc-10*sc} y1={headY-headR-8*sc+i*4*sc} x2={headX+2*sc+10*sc} y2={headY-headR-8*sc+i*4*sc} stroke="#B8832A" strokeWidth={0.5*sc} opacity="0.5"/>)}
+          </g>}
+
+          {/* Flip flops — on feet */}
+          {accessory==="flipflops"&&<g>
+            <ellipse cx={leg1X-10*sc} cy={leg1BotY+6*sc} rx={9*sc} ry={4*sc} fill="#FF6B6B" opacity="0.9"/>
+            <ellipse cx={leg2X+4*sc} cy={leg2BotY+6*sc} rx={9*sc} ry={4*sc} fill="#4ECDC4" opacity="0.9"/>
+            <line x1={leg1X-10*sc} y1={leg1BotY+3*sc} x2={leg1X-6*sc} y2={leg1BotY} stroke="#FF6B6B" strokeWidth={2*sc}/>
+            <line x1={leg2X+4*sc} y1={leg2BotY+3*sc} x2={leg2X+8*sc} y2={leg2BotY} stroke="#4ECDC4" strokeWidth={2*sc}/>
+          </g>}
+
+          {/* Snorkel — mask on face + tube */}
+          {accessory==="snorkel"&&<g>
+            {/* Mask */}
+            <ellipse cx={eyeX} cy={eyeY} r={8*sc} fill="#4ECDC4" opacity="0.5" stroke="#2B9E9E" strokeWidth={1.5*sc}/>
+            <ellipse cx={eyeX} cy={eyeY} r={6*sc} fill="none" stroke="#2B9E9E" strokeWidth={1*sc}/>
+            {/* Tube going up */}
+            <path d={`M ${headX+Math.cos(neckAngle-0.8)*headR} ${headY+Math.sin(neckAngle-0.8)*headR} Q ${headX+Math.cos(neckAngle-0.8)*headR+10*sc} ${headY+Math.sin(neckAngle-0.8)*headR-20*sc} ${headX+Math.cos(neckAngle-0.8)*headR+8*sc} ${headY+Math.sin(neckAngle-0.8)*headR-30*sc}`} fill="none" stroke="#FF6B6B" strokeWidth={3*sc} strokeLinecap="round"/>
+            {/* Mouthpiece tip */}
+            <circle cx={headX+Math.cos(neckAngle-0.8)*headR+8*sc} cy={headY+Math.sin(neckAngle-0.8)*headR-30*sc} r={3*sc} fill="#FF6B6B"/>
+          </g>}
         </g>
       )}
       {holeVisible&&<><ellipse cx={neckTipX} cy={groundY} rx={16*sc*Math.min(1,(buried-0.25)/0.5)} ry={5*sc*Math.min(1,(buried-0.25)/0.5)} fill="#b8945e" opacity="0.9"/>{buried>0.5&&<ellipse cx={neckTipX} cy={groundY+2} rx={18*sc} ry={sandDepth*0.5} fill="#c8a96e" opacity="0.85"/>}</>}
