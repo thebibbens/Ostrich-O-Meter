@@ -346,28 +346,28 @@ function OstrichSVG({ pct, feather, eyeColor, accessories = [], legStyle, size, 
 function IslandScene({ members, myId, onSelectMember, selectedMember }) {
   const memberList = Object.values(members);
   const count = memberList.length;
-  const islandW = Math.max(500, 160 + count * 120);
-  const islandH = 260;
+  const islandW = Math.max(600, 200 + count * 160);
+  const islandH = 280;
   const islandCX = islandW / 2;
-  const islandCY = 200;
-  const islandRX = islandW * 0.44;
-  const islandRY = 55;
+  const islandCY = 210;
+  const islandRX = islandW * 0.42;
+  const islandRY = 58;
 
-  // Positions: scatter ostriches across island with slight randomness, seeded by index
+  // Positions: scatter ostriches across island with better spacing
   const getPos = (i, total) => {
-    const spread = islandRX * 0.78;
-    const step = total > 1 ? (spread * 2) / total : 0;
-    const baseX = islandCX - spread + step * i + step * 0.5;
+    const spread = islandRX * 0.68;
+    const step = total > 1 ? (spread * 2) / (total) : 0;
+    const baseX = islandCX - spread + step * i + (total > 1 ? step * 0.5 : 0);
     // Slight vertical randomness based on index
-    const offY = ((i * 37 + 13) % 30) - 15;
-    return { x: baseX, y: islandCY - 30 + offY };
+    const offY = ((i * 37 + 13) % 24) - 12;
+    return { x: baseX, y: islandCY - 45 + offY };
   };
 
   return (
     <div style={{width:"100%",overflowX:"auto",marginBottom:"1.5rem"}}>
-      <svg width={islandW} height={islandH + 20} viewBox={`0 0 ${islandW} ${islandH + 20}`} style={{display:"block",margin:"0 auto",maxWidth:"100%"}}>
+      <svg width={islandW} height={islandH + 30} viewBox={`0 0 ${islandW} ${islandH + 30}`} style={{display:"block",margin:"0 auto",maxWidth:"100%"}}>
         {/* Ocean */}
-        <rect x={0} y={0} width={islandW} height={islandH+20} fill="#64B5F6" rx={16}/>
+        <rect x={0} y={0} width={islandW} height={islandH+30} fill="#64B5F6" rx={16}/>
         {/* Ocean waves */}
         {[0,1,2,3].map(i=>(
           <ellipse key={i} cx={islandW*0.15+i*islandW*0.22} cy={islandH*0.25+i*8} rx={islandW*0.12} ry={8} fill="#90CAF9" opacity="0.4"/>
@@ -385,30 +385,129 @@ function IslandScene({ members, myId, onSelectMember, selectedMember }) {
         <text x={islandCX-islandRX*0.6} y={islandCY+28} fontSize={14} opacity="0.7">⭐</text>
         <text x={islandCX+islandRX*0.5} y={islandCY+32} fontSize={12} opacity="0.6">🐚</text>
 
-        {/* Palm tree 1 (left) */}
-        <line x1={islandCX-islandRX*0.7} y1={islandCY+8} x2={islandCX-islandRX*0.72} y2={islandCY-80} stroke="#8B6343" strokeWidth={6} strokeLinecap="round"/>
-        <ellipse cx={islandCX-islandRX*0.72} cy={islandCY-80} rx={28} ry={12} fill="#2E7D32" transform={`rotate(-20,${islandCX-islandRX*0.72},${islandCY-80})`}/>
-        <ellipse cx={islandCX-islandRX*0.72} cy={islandCY-80} rx={22} ry={10} fill="#388E3C" transform={`rotate(10,${islandCX-islandRX*0.72},${islandCY-80})`}/>
-        <ellipse cx={islandCX-islandRX*0.72} cy={islandCY-80} rx={18} ry={8} fill="#43A047" transform={`rotate(-35,${islandCX-islandRX*0.72},${islandCY-80})`}/>
-        {/* Coconuts */}
-        {[0,1,2].map(i=><circle key={i} cx={islandCX-islandRX*0.72+i*5-5} cy={islandCY-75} r={4} fill="#8B6343"/>)}
+        {/* Palm tree 1 (left) — curved trunk with fronds */}
+        {(() => {
+          const tx = islandCX - islandRX * 0.72;
+          const ty = islandCY + 10;
+          const topX = islandCX - islandRX * 0.68;
+          const topY = islandCY - 90;
+          // Trunk segments (slightly curved, widening at base)
+          const trunkPath = `M ${tx} ${ty} C ${tx+4} ${ty-30} ${topX+6} ${topY+50} ${topX} ${topY}`;
+          const fronds = [
+            { angle: -140, len: 52, droop: 18 },
+            { angle: -110, len: 58, droop: 22 },
+            { angle: -80,  len: 60, droop: 20 },
+            { angle: -55,  len: 52, droop: 18 },
+            { angle: -30,  len: 44, droop: 14 },
+            { angle: -165, len: 40, droop: 12 },
+          ];
+          return (
+            <g>
+              {/* Trunk */}
+              <path d={trunkPath} fill="none" stroke="#6B4226" strokeWidth={9} strokeLinecap="round"/>
+              <path d={trunkPath} fill="none" stroke="#8B5E34" strokeWidth={7} strokeLinecap="round"/>
+              {/* Bark notches */}
+              {[0.15,0.28,0.42,0.55,0.68,0.8].map((t,i) => {
+                const bx = tx + (topX-tx)*t + 4;
+                const by = ty + (topY-ty)*t;
+                return <line key={i} x1={bx-5} y1={by} x2={bx+2} y2={by+3} stroke="#6B4226" strokeWidth={2} strokeLinecap="round" opacity="0.7"/>;
+              })}
+              {/* Fronds */}
+              {fronds.map((fr, i) => {
+                const rad = fr.angle * Math.PI / 180;
+                const midX = topX + Math.cos(rad) * fr.len * 0.55;
+                const midY = topY + Math.sin(rad) * fr.len * 0.55 + fr.droop * 0.4;
+                const endX = topX + Math.cos(rad) * fr.len;
+                const endY = topY + Math.sin(rad) * fr.len + fr.droop;
+                const perpX = -Math.sin(rad) * 7;
+                const perpY = Math.cos(rad) * 7;
+                return (
+                  <g key={i}>
+                    <path d={`M ${topX} ${topY} Q ${midX} ${midY} ${endX} ${endY}`}
+                      fill="none" stroke="#1B5E20" strokeWidth={4} strokeLinecap="round" opacity="0.9"/>
+                    <path d={`M ${topX} ${topY} Q ${midX+perpX*0.8} ${midY+perpY*0.8} ${endX+perpX} ${endY+perpY}`}
+                      fill="none" stroke="#2E7D32" strokeWidth={2} strokeLinecap="round" opacity="0.6"/>
+                    <path d={`M ${topX} ${topY} Q ${midX-perpX*0.8} ${midY-perpY*0.8} ${endX-perpX} ${endY-perpY}`}
+                      fill="none" stroke="#2E7D32" strokeWidth={2} strokeLinecap="round" opacity="0.6"/>
+                    {/* Leaflets along frond */}
+                    {[0.3,0.5,0.7,0.87].map((t2, j) => {
+                      const lx = topX + (endX-topX)*t2;
+                      const ly = topY + (endY-topY)*t2 + fr.droop*t2*t2*0.6;
+                      const llen = 10 - j*1.5;
+                      return (
+                        <g key={j}>
+                          <line x1={lx} y1={ly} x2={lx+perpX*llen/7} y2={ly+perpY*llen/7+llen*0.4} stroke="#388E3C" strokeWidth={1.5} strokeLinecap="round" opacity="0.8"/>
+                          <line x1={lx} y1={ly} x2={lx-perpX*llen/7} y2={ly-perpY*llen/7+llen*0.4} stroke="#388E3C" strokeWidth={1.5} strokeLinecap="round" opacity="0.8"/>
+                        </g>
+                      );
+                    })}
+                  </g>
+                );
+              })}
+              {/* Coconuts */}
+              {[[-4,4],[4,6],[0,9]].map(([dx,dy],i)=><circle key={i} cx={topX+dx} cy={topY+dy} r={4} fill="#7a5230"/>)}
+            </g>
+          );
+        })()}
 
         {/* Palm tree 2 (right) if island wide enough */}
-        {islandW > 400 && <>
-          <line x1={islandCX+islandRX*0.68} y1={islandCY+8} x2={islandCX+islandRX*0.71} y2={islandCY-70} stroke="#8B6343" strokeWidth={5} strokeLinecap="round"/>
-          <ellipse cx={islandCX+islandRX*0.71} cy={islandCY-70} rx={24} ry={10} fill="#2E7D32" transform={`rotate(15,${islandCX+islandRX*0.71},${islandCY-70})`}/>
-          <ellipse cx={islandCX+islandRX*0.71} cy={islandCY-70} rx={20} ry={9} fill="#388E3C" transform={`rotate(-10,${islandCX+islandRX*0.71},${islandCY-70})`}/>
-          {[0,1].map(i=><circle key={i} cx={islandCX+islandRX*0.71+i*4-2} cy={islandCY-65} r={3.5} fill="#8B6343"/>)}
-        </>}
-
-        {/* Hammock between trees if 2+ palms */}
-        {islandW > 400 && <>
-          <path d={`M ${islandCX-islandRX*0.68} ${islandCY-40} Q ${islandCX} ${islandCY-20} ${islandCX+islandRX*0.67} ${islandCY-40}`} fill="none" stroke="#E8762A" strokeWidth={4} strokeLinecap="round" opacity="0.8"/>
-          <path d={`M ${islandCX-islandRX*0.68} ${islandCY-50} Q ${islandCX} ${islandCY-30} ${islandCX+islandRX*0.67} ${islandCY-50}`} fill="none" stroke="#E8762A" strokeWidth={4} strokeLinecap="round" opacity="0.8"/>
-          {/* Hammock ropes */}
-          <line x1={islandCX-islandRX*0.72} y1={islandCY-55} x2={islandCX-islandRX*0.68} y2={islandCY-40} stroke="#C4963C" strokeWidth={1.5} opacity="0.7"/>
-          <line x1={islandCX+islandRX*0.71} y1={islandCY-50} x2={islandCX+islandRX*0.67} y2={islandCY-40} stroke="#C4963C" strokeWidth={1.5} opacity="0.7"/>
-        </>}
+        {islandW > 450 && (() => {
+          const tx = islandCX + islandRX * 0.68;
+          const ty = islandCY + 8;
+          const topX = islandCX + islandRX * 0.63;
+          const topY = islandCY - 82;
+          const trunkPath = `M ${tx} ${ty} C ${tx-3} ${ty-28} ${topX-5} ${topY+45} ${topX} ${topY}`;
+          const fronds = [
+            { angle: -40,  len: 52, droop: 18 },
+            { angle: -70,  len: 58, droop: 22 },
+            { angle: -100, len: 60, droop: 20 },
+            { angle: -125, len: 52, droop: 18 },
+            { angle: -150, len: 44, droop: 14 },
+            { angle: -18,  len: 40, droop: 12 },
+          ];
+          return (
+            <g>
+              <path d={trunkPath} fill="none" stroke="#6B4226" strokeWidth={8} strokeLinecap="round"/>
+              <path d={trunkPath} fill="none" stroke="#8B5E34" strokeWidth={6} strokeLinecap="round"/>
+              {[0.15,0.28,0.42,0.55,0.68,0.8].map((t,i) => {
+                const bx = tx + (topX-tx)*t - 3;
+                const by = ty + (topY-ty)*t;
+                return <line key={i} x1={bx-3} y1={by} x2={bx+4} y2={by+3} stroke="#6B4226" strokeWidth={2} strokeLinecap="round" opacity="0.7"/>;
+              })}
+              {fronds.map((fr, i) => {
+                const rad = fr.angle * Math.PI / 180;
+                const midX = topX + Math.cos(rad) * fr.len * 0.55;
+                const midY = topY + Math.sin(rad) * fr.len * 0.55 + fr.droop * 0.4;
+                const endX = topX + Math.cos(rad) * fr.len;
+                const endY = topY + Math.sin(rad) * fr.len + fr.droop;
+                const perpX = -Math.sin(rad) * 7;
+                const perpY = Math.cos(rad) * 7;
+                return (
+                  <g key={i}>
+                    <path d={`M ${topX} ${topY} Q ${midX} ${midY} ${endX} ${endY}`}
+                      fill="none" stroke="#1B5E20" strokeWidth={4} strokeLinecap="round" opacity="0.9"/>
+                    <path d={`M ${topX} ${topY} Q ${midX+perpX*0.8} ${midY+perpY*0.8} ${endX+perpX} ${endY+perpY}`}
+                      fill="none" stroke="#2E7D32" strokeWidth={2} strokeLinecap="round" opacity="0.6"/>
+                    <path d={`M ${topX} ${topY} Q ${midX-perpX*0.8} ${midY-perpY*0.8} ${endX-perpX} ${endY-perpY}`}
+                      fill="none" stroke="#2E7D32" strokeWidth={2} strokeLinecap="round" opacity="0.6"/>
+                    {[0.3,0.5,0.7,0.87].map((t2, j) => {
+                      const lx = topX + (endX-topX)*t2;
+                      const ly = topY + (endY-topY)*t2 + fr.droop*t2*t2*0.6;
+                      const llen = 10 - j*1.5;
+                      return (
+                        <g key={j}>
+                          <line x1={lx} y1={ly} x2={lx+perpX*llen/7} y2={ly+perpY*llen/7+llen*0.4} stroke="#388E3C" strokeWidth={1.5} strokeLinecap="round" opacity="0.8"/>
+                          <line x1={lx} y1={ly} x2={lx-perpX*llen/7} y2={ly-perpY*llen/7+llen*0.4} stroke="#388E3C" strokeWidth={1.5} strokeLinecap="round" opacity="0.8"/>
+                        </g>
+                      );
+                    })}
+                  </g>
+                );
+              })}
+              {[[-4,4],[4,6],[0,9]].map(([dx,dy],i)=><circle key={i} cx={topX+dx} cy={topY+dy} r={3.5} fill="#7a5230"/>)}
+            </g>
+          );
+        })()}
 
         {/* Ostriches */}
         {memberList.map((member, i) => {
@@ -424,14 +523,14 @@ function IslandScene({ members, myId, onSelectMember, selectedMember }) {
           const isSelected = selectedMember === member.id;
           return (
             <g key={member.id} onClick={() => onSelectMember(member.id === selectedMember ? null : member.id)} style={{cursor:"pointer"}}>
-              {(isSelected || isMe) && <ellipse cx={pos.x} cy={pos.y+ostH*0.5} rx={ostW*0.5} ry={8} fill={isMe?"#534AB7":"#FFD93D"} opacity="0.35"/>}
+              {(isSelected || isMe) && <ellipse cx={pos.x} cy={pos.y+ostH*0.52} rx={ostW*0.5} ry={8} fill={isMe?"#534AB7":"#FFD93D"} opacity="0.35"/>}
               <foreignObject x={pos.x - ostW/2} y={pos.y - ostH*0.3} width={ostW} height={ostH}>
                 <div xmlns="http://www.w3.org/1999/xhtml" style={{width:ostW,height:ostH}}>
                   <OstrichSVG pct={member.pct} feather={f} eyeColor={e.color} accessories={accs} legStyle={leg} size={sz} name={member.name}/>
                 </div>
               </foreignObject>
-              {/* Name label */}
-              <text x={pos.x} y={pos.y+ostH*0.55} textAnchor="middle" fontSize={10} fontWeight={isMe?"700":"500"} fill={isMe?"#534AB7":"#444"}>
+              {/* Name label — below the feet */}
+              <text x={pos.x} y={pos.y+ostH*0.62} textAnchor="middle" fontSize={10} fontWeight={isMe?"700":"500"} fill={isMe?"#534AB7":"#444"}>
                 {member.name}
               </text>
             </g>
