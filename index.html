@@ -305,7 +305,7 @@ function IslandScene({ members, myId, onSelectMember, selectedMember }) {
   const count = memberList.length;
 
   // Island grows with member count
-  const islandW = Math.max(700, 300 + count * 190);
+  const islandW = Math.max(700, 200 + count * 260);
   const islandH = 420; // tall enough for ostriches above + sand below
   const islandCX = islandW / 2;
   // Sand ellipse center — sits in lower half of the scene
@@ -323,19 +323,19 @@ function IslandScene({ members, myId, onSelectMember, selectedMember }) {
   const usableRight = islandCX + palmZone * 0.80;
   const usableW = usableRight - usableLeft;
 
-  const backRow = memberList.filter((_, i) => i % 2 === 0);
-  const frontRow = memberList.filter((_, i) => i % 2 === 1);
+  const backRow = memberList;
+  const frontRow = [];
 
   const getX = (rowIndex, rowTotal, inset) => {
-    const left = usableLeft + (inset ? usableW * 0.12 : 0);
-    const right = usableRight - (inset ? usableW * 0.12 : 0);
+    const left = usableLeft;
+    const right = usableRight;
     const w = right - left;
     const slot = rowTotal > 0 ? w / rowTotal : w;
     return left + slot * rowIndex + slot * 0.5;
   };
 
-  const backFeetY = sandSurface - 12;
-  const frontFeetY = sandSurface + 10;
+  const backFeetY = sandSurface + 4;
+  const frontFeetY = sandSurface + 4;
 
   return (
     <div style={{width:"100%",overflowX:"auto",marginBottom:"1.5rem"}}>
@@ -492,7 +492,7 @@ function IslandScene({ members, myId, onSelectMember, selectedMember }) {
           const e = EYE_COLORS[member.customization?.eye ?? 0];
           const accs = member.customization?.accessories ?? [];
           const leg = member.customization?.legStyle ?? "normal";
-          const baseSz = SIZE_OPTIONS[member.customization?.size ?? 1].scale * 0.7;
+          const baseSz = SIZE_OPTIONS[member.customization?.size ?? 1].scale * 0.55;
           const sz = isBack ? baseSz * 0.82 : baseSz;
           const isMe = member.id === myId;
           const isSelected = selectedMember === member.id;
