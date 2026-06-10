@@ -323,13 +323,24 @@ function IslandScene({ members, myId, onSelectMember, selectedMember }) {
   const usableRight = islandCX + palmZone * 0.80;
   const usableW = usableRight - usableLeft;
 
+  // Stagger ostriches: even indices go back row (higher, smaller), odd go front row (lower, bigger)
+  // Back row: y = sandSurface - 18, scale *= 0.85
+  // Front row: y = sandSurface + 8, scale *= 1.0
+  // Each row gets its own evenly-spaced slots across the usable width
   const getPos = (i, total) => {
-    const slotW = total > 0 ? usableW / total : usableW;
-    const baseX = usableLeft + slotW * i + slotW * 0.5;
-    // feet sit ON the sand surface
-    const feetY = sandSurface + 8;
-    const offY = ((i * 37 + 13) % 16) - 8; // tiny vertical wobble
-    return { x: baseX, feetY: feetY + offY };
+    const isBack = i % 2 === 0;
+    const backCount = Math.ceil(total / 2);
+    const frontCount = Math.floor(total / 2);
+    const rowCount = isBack ? backCount : frontCount;
+    const rowIndex = Math.floor(i / 2);
+    // Back row is slightly narrower (more centred), front row uses full width
+    const rowLeft = isBack ? usableLeft + usableW * 0.06 : usableLeft;
+    const rowRight = isBack ? usableRight - usableW * 0.06 : usableRight;
+    const rowW = rowRight - rowLeft;
+    const slotW = rowCount > 0 ? rowW / rowCount : rowW;
+    const baseX = rowLeft + slotW * rowIndex + slotW * 0.5;
+    const feetY = isBack ? sandSurface - 14 : sandSurface + 10;
+    return { x: baseX, feetY, isBack };
   };
 
   return (
@@ -478,22 +489,28 @@ function IslandScene({ members, myId, onSelectMember, selectedMember }) {
           );
         })()}
 
-        {/* Ostriches */}
-        {memberList.map((member, i) => {
+        {/* Ostriches — back row first so front row draws on top */}
+        {[...memberList.map((m,i)=>({member:m,i}))].sort((a,b)=>{
+          const aBack = a.i % 2 === 0;
+          const bBack = b.i % 2 === 0;
+          return (bBack ? 0 : 1) - (aBack ? 0 : 1); // back row (true) sorts before front row
+        }).map(({member, i}) => {
           const pos = getPos(i, count);
           const f = FEATHER_COLORS[member.customization?.feather ?? 0];
           const e = EYE_COLORS[member.customization?.eye ?? 0];
           const accs = member.customization?.accessories ?? [];
           const leg = member.customization?.legStyle ?? "normal";
-          const sz = SIZE_OPTIONS[member.customization?.size ?? 1].scale * 0.7;
+          const baseSz = SIZE_OPTIONS[member.customization?.size ?? 1].scale * 0.7;
+          const sz = pos.isBack ? baseSz * 0.82 : baseSz;
           const isMe = member.id === myId;
           const isSelected = selectedMember === member.id;
-          const nameY = pos.feetY + 16;
+          const nameY = pos.feetY + 15;
+          const nameSz = pos.isBack ? 9 : 10;
           return (
             <g key={member.id} onClick={() => onSelectMember(member.id === selectedMember ? null : member.id)} style={{cursor:"pointer"}}>
-              {(isSelected || isMe) && <ellipse cx={pos.x} cy={pos.feetY + 4} rx={40} ry={7} fill={isMe?"#534AB7":"#FFD93D"} opacity="0.3"/>}
+              {(isSelected || isMe) && <ellipse cx={pos.x} cy={pos.feetY + 4} rx={pos.isBack?32:40} ry={pos.isBack?5:7} fill={isMe?"#534AB7":"#FFD93D"} opacity="0.3"/>}
               <OstrichGroup pct={member.pct} feather={f} eyeColor={e.color} accessories={accs} legStyle={leg} size={sz} ox={pos.x} oy={pos.feetY}/>
-              <text x={pos.x} y={nameY} textAnchor="middle" fontSize={10} fontWeight={isMe?"700":"500"} fill={isMe?"#534AB7":"#444"}>
+              <text x={pos.x} y={nameY} textAnchor="middle" fontSize={nameSz} fontWeight={isMe?"700":"500"} fill={isMe?"#534AB7":"#555"} opacity={pos.isBack?0.8:1}>
                 {member.name}
               </text>
             </g>
