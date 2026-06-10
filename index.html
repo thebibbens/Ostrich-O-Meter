@@ -128,25 +128,24 @@ function OstrichSVG({ pct, feather, eyeColor, accessories = [], legStyle, size, 
 
   // At 200% show tombstone
   if (pct >= 200) {
-    const epitaph = getEpitaph(name || "");
     return (
       <svg width="100%" viewBox="0 0 120 200" style={{overflow:"visible",display:"block"}}>
-        {/* Ground */}
-        <ellipse cx={60} cy={175} rx={45} ry={8} fill="#c8a96e" opacity="0.4"/>
-        <rect x={0} y={172} width={120} height={14} fill="#c8a96e" opacity="0.2" rx={3}/>
-        {/* Tombstone */}
-        <rect x={38} y={100} width={44} height={55} rx={4} fill="#9E9E9E"/>
-        <ellipse cx={60} cy={100} rx={22} ry={16} fill="#9E9E9E"/>
-        <rect x={40} y={102} width={40} height={51} rx={2} fill="#BDBDBD"/>
-        <ellipse cx={60} cy={100} rx={20} ry={14} fill="#BDBDBD"/>
+        {/* Dirt mound */}
+        <ellipse cx={60} cy={172} rx={40} ry={10} fill="#a07840" opacity="0.5"/>
+        <ellipse cx={60} cy={170} rx={36} ry={8} fill="#b8945e" opacity="0.6"/>
+        {/* Tombstone body */}
+        <rect x={34} y={95} width={52} height={65} rx={5} fill="#8a8a8a"/>
+        <ellipse cx={60} cy={95} rx={26} ry={18} fill="#8a8a8a"/>
+        {/* Tombstone face (lighter) */}
+        <rect x={37} y={97} width={46} height={61} rx={3} fill="#b0b0b0"/>
+        <ellipse cx={60} cy={95} rx={23} ry={15} fill="#b0b0b0"/>
+        {/* Stone texture */}
+        <ellipse cx={48} cy={88} rx={6} ry={4} fill="#c8c8c8" opacity="0.4"/>
         {/* Cross */}
-        <rect x={56} y={108} width={8} height={22} rx={2} fill="#757575"/>
-        <rect x={50} y={114} width={20} height={6} rx={2} fill="#757575"/>
-        {/* RIP text */}
-        <text x={60} y={140} textAnchor="middle" fontSize={9} fontWeight="bold" fill="#555">RIP</text>
-        <text x={60} y={151} textAnchor="middle" fontSize={6} fill="#666">{(name||"").substring(0,10)}</text>
-        <text x={60} y={161} textAnchor="middle" fontSize={4.5} fill="#888" fontStyle="italic">{epitaph.substring(0,22)}</text>
-        {epitaph.length > 22 && <text x={60} y={167} textAnchor="middle" fontSize={4.5} fill="#888" fontStyle="italic">{epitaph.substring(22)}</text>}
+        <rect x={56} y={105} width={8} height={28} rx={2} fill="#707070"/>
+        <rect x={48} y={113} width={24} height={7} rx={2} fill="#707070"/>
+        {/* RIP text — large and readable */}
+        <text x={60} y={150} textAnchor="middle" fontSize={14} fontWeight="bold" fill="#505050">RIP</text>
       </svg>
     );
   }
@@ -154,11 +153,11 @@ function OstrichSVG({ pct, feather, eyeColor, accessories = [], legStyle, size, 
   const groundY = 170 * sc;
   const bx = 58*sc, by = 120*sc, brx = 34*sc, bry = 30*sc;
 
-  // Body sinks when pct > 100
+  // Body sinks when pct > 100 — whole bird moves down together
   const bodySink = buriedBody * 40 * sc;
 
   const neckBaseX = bx - 10*sc;
-  const neckBaseY = by - bry + 4*sc;
+  const neckBaseY = by - bry + 4*sc + bodySink;  // sink with body
   const neckLen = 60*sc;
   const angleStart = -80*(Math.PI/180), angleEnd = -200*(Math.PI/180);
   const neckAngle = angleStart + buried100*(angleEnd - angleStart);
@@ -198,7 +197,7 @@ function OstrichSVG({ pct, feather, eyeColor, accessories = [], legStyle, size, 
 
   // Body position adjusted for sinking
   const bodyY = by + bodySink;
-  const bodyNeckBaseY = bodyY - bry + 4*sc;
+  const bodyNeckBaseY = neckBaseY;  // already includes bodySink
 
   const hasAcc = (v) => accessories.includes(v);
 
@@ -346,21 +345,22 @@ function OstrichSVG({ pct, feather, eyeColor, accessories = [], legStyle, size, 
 function IslandScene({ members, myId, onSelectMember, selectedMember }) {
   const memberList = Object.values(members);
   const count = memberList.length;
-  const islandW = Math.max(600, 200 + count * 160);
-  const islandH = 280;
+  const islandW = Math.max(640, 260 + count * 180);
+  const islandH = 300;
   const islandCX = islandW / 2;
-  const islandCY = 210;
-  const islandRX = islandW * 0.42;
-  const islandRY = 58;
+  const islandCY = 220;
+  const islandRX = islandW * 0.41;
+  const islandRY = 60;
 
-  // Positions: scatter ostriches across island with better spacing
+  // Each ostrich gets a fixed slot width; positions stay well inside the sand
+  // Palm trees occupy ~15% from each edge, so ostriches span the middle 60%
   const getPos = (i, total) => {
-    const spread = islandRX * 0.68;
-    const step = total > 1 ? (spread * 2) / (total) : 0;
-    const baseX = islandCX - spread + step * i + (total > 1 ? step * 0.5 : 0);
-    // Slight vertical randomness based on index
-    const offY = ((i * 37 + 13) % 24) - 12;
-    return { x: baseX, y: islandCY - 45 + offY };
+    const margin = islandRX * 0.22; // keep away from palm tree zones
+    const usableW = islandRX * 2 - margin * 2;
+    const slotW = total > 0 ? usableW / total : usableW;
+    const baseX = (islandCX - islandRX + margin) + slotW * i + slotW * 0.5;
+    const offY = ((i * 37 + 13) % 20) - 10;
+    return { x: baseX, y: islandCY - 40 + offY };
   };
 
   return (
@@ -517,20 +517,22 @@ function IslandScene({ members, myId, onSelectMember, selectedMember }) {
           const accs = member.customization?.accessories ?? [];
           const leg = member.customization?.legStyle ?? "normal";
           const sz = SIZE_OPTIONS[member.customization?.size ?? 1].scale * 0.7;
-          const ostW = 80;
-          const ostH = 140;
+          const ostW = 120;  // wider so nothing clips
+          const ostH = 180;  // taller to fit neck-up ostriches fully
           const isMe = member.id === myId;
           const isSelected = selectedMember === member.id;
+          // Name sits 8px below the foreignObject bottom
+          const nameY = pos.y - ostH * 0.15 + ostH + 10;
           return (
             <g key={member.id} onClick={() => onSelectMember(member.id === selectedMember ? null : member.id)} style={{cursor:"pointer"}}>
-              {(isSelected || isMe) && <ellipse cx={pos.x} cy={pos.y+ostH*0.52} rx={ostW*0.5} ry={8} fill={isMe?"#534AB7":"#FFD93D"} opacity="0.35"/>}
-              <foreignObject x={pos.x - ostW/2} y={pos.y - ostH*0.3} width={ostW} height={ostH}>
+              {(isSelected || isMe) && <ellipse cx={pos.x} cy={nameY - 12} rx={ostW*0.42} ry={7} fill={isMe?"#534AB7":"#FFD93D"} opacity="0.3"/>}
+              <foreignObject x={pos.x - ostW/2} y={pos.y - ostH*0.15} width={ostW} height={ostH}>
                 <div xmlns="http://www.w3.org/1999/xhtml" style={{width:ostW,height:ostH}}>
                   <OstrichSVG pct={member.pct} feather={f} eyeColor={e.color} accessories={accs} legStyle={leg} size={sz} name={member.name}/>
                 </div>
               </foreignObject>
-              {/* Name label — below the feet */}
-              <text x={pos.x} y={pos.y+ostH*0.62} textAnchor="middle" fontSize={10} fontWeight={isMe?"700":"500"} fill={isMe?"#534AB7":"#444"}>
+              {/* Name label — anchored below foreignObject bottom */}
+              <text x={pos.x} y={nameY} textAnchor="middle" fontSize={10} fontWeight={isMe?"700":"500"} fill={isMe?"#534AB7":"#444"}>
                 {member.name}
               </text>
             </g>
@@ -927,16 +929,17 @@ function App() {
             const lbl = getLabel(m.pct);
             const isMe = m.id === myId;
             const isSel = m.id === selectedMember;
+            const isDead = m.pct >= 200;
             return (
               <div key={m.id} onClick={()=>setSelectedMember(m.id===selectedMember?null:m.id)}
                 style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"5px 8px",borderRadius:8,marginBottom:4,cursor:"pointer",background:isSel?"#f0effe":isMe?"#f8f7ff":"transparent",border:isSel?"1px solid #534AB7":"1px solid transparent"}}>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                   {(isMe||isAdmin) && <button onClick={e=>{e.stopPropagation();removeMember(m.id);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"#ddd",padding:0,lineHeight:1}}>×</button>}
-                  <span style={{fontSize:13,fontWeight:isMe?600:400}}>{m.name}{isMe?" (you)":""}</span>
+                  <span style={{fontSize:13,fontWeight:isMe?600:400}}>{isDead?"🪦 ":""}{m.name}{isMe?" (you)":""}</span>
                 </div>
                 <div style={{textAlign:"right"}}>
                   <span style={{fontSize:13,fontWeight:600,color:lbl.color}}>{m.pct}%</span>
-                  <p style={{fontSize:9,color:"#aaa",margin:0,fontStyle:"italic"}}>{lbl.label}</p>
+                  <p style={{fontSize:9,color:"#aaa",margin:0,fontStyle:"italic"}}>{isDead ? getEpitaph(m.name) : lbl.label}</p>
                 </div>
               </div>
             );
