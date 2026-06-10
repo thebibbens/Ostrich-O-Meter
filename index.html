@@ -16,7 +16,7 @@
   input[type=text] { padding: 8px 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; width: 100%; outline: none; }
   input[type=text]:focus { border-color: #534AB7; }
   button { font-family: inherit; cursor: pointer; }
-  .chat-box { height: 280px; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .chat-box { height: 240px; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
   .chat-box::-webkit-scrollbar { width: 4px; }
   .chat-box::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
 </style>
@@ -46,7 +46,24 @@ const LABELS = [
   { max: 60, label: "Considering the sand", color: "#BA7517" },
   { max: 80, label: "Going under…", color: "#D85A30" },
   { max: 100, label: "Fully submerged, send help", color: "#A32D2D" },
+  { max: 120, label: "Please send snacks", color: "#7B1FA2" },
+  { max: 140, label: "Body also going under", color: "#6A1560" },
+  { max: 160, label: "Tell my plants I loved them", color: "#4A0E4E" },
+  { max: 180, label: "Accepting condolences", color: "#3B0A3B" },
+  { max: 199, label: "It was nice knowing you", color: "#2C0728" },
+  { max: 200, label: "Gone. Just gone.", color: "#1a1a1a" },
 ];
+
+const EPITAPHS = [
+  "Will try again tomorrow…",
+  "Completely unavailable",
+  "Out of office permanently",
+  "Do not disturb (seriously)",
+  "Gone to find wifi",
+  "Currently unreachable",
+  "Left the chat",
+];
+
 const FEATHER_COLORS = [
   { name: "Classic black", body: "#2C2C2A", wing: "#e8e8e8", neck: "#8a8a9a", beak: "#E8762A" },
   { name: "Midnight blue", body: "#1a2a4a", wing: "#b0c4de", neck: "#6a7a9a", beak: "#E8762A" },
@@ -86,7 +103,7 @@ const SIZE_OPTIONS = [
   { name: "Normal", scale: 1.0 },
   { name: "Tall", scale: 1.2 },
 ];
-const DEFAULT_CUSTOMIZATION = { feather: 0, eye: 0, accessory: "none", legStyle: "normal", size: 1 };
+const DEFAULT_CUSTOMIZATION = { feather: 0, eye: 0, accessories: [], legStyle: "normal", size: 1 };
 
 function getLabel(pct) { return LABELS.find(l => pct <= l.max) || LABELS[LABELS.length - 1]; }
 function genCode() { return Math.random().toString(36).substring(2, 8).toUpperCase(); }
@@ -94,20 +111,63 @@ function formatTime(ts) {
   const d = new Date(ts);
   return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
+function getEpitaph(name) {
+  // Deterministic per name so it's stable per session but feels random
+  const idx = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % EPITAPHS.length;
+  return EPITAPHS[idx];
+}
 
-function OstrichSVG({ pct, feather, eyeColor, accessory, legStyle, size }) {
-  const sc = size, buried = pct / 100, W = 120, groundY = 170 * sc;
+// ── OSTRICH SVG ──────────────────────────────────────────────────
+function OstrichSVG({ pct, feather, eyeColor, accessories = [], legStyle, size, name }) {
+  const sc = size;
+  const pct100 = Math.min(pct, 100);
+  const pctOver = Math.max(0, pct - 100); // 0-100 extra
+  const buried100 = pct100 / 100;
+  const buriedBody = pctOver / 100; // how much body sinks
+  const W = 120;
+
+  // At 200% show tombstone
+  if (pct >= 200) {
+    const epitaph = getEpitaph(name || "");
+    return (
+      <svg width="100%" viewBox="0 0 120 200" style={{overflow:"visible",display:"block"}}>
+        {/* Ground */}
+        <ellipse cx={60} cy={175} rx={45} ry={8} fill="#c8a96e" opacity="0.4"/>
+        <rect x={0} y={172} width={120} height={14} fill="#c8a96e" opacity="0.2" rx={3}/>
+        {/* Tombstone */}
+        <rect x={38} y={100} width={44} height={55} rx={4} fill="#9E9E9E"/>
+        <ellipse cx={60} cy={100} rx={22} ry={16} fill="#9E9E9E"/>
+        <rect x={40} y={102} width={40} height={51} rx={2} fill="#BDBDBD"/>
+        <ellipse cx={60} cy={100} rx={20} ry={14} fill="#BDBDBD"/>
+        {/* Cross */}
+        <rect x={56} y={108} width={8} height={22} rx={2} fill="#757575"/>
+        <rect x={50} y={114} width={20} height={6} rx={2} fill="#757575"/>
+        {/* RIP text */}
+        <text x={60} y={140} textAnchor="middle" fontSize={9} fontWeight="bold" fill="#555">RIP</text>
+        <text x={60} y={151} textAnchor="middle" fontSize={6} fill="#666">{(name||"").substring(0,10)}</text>
+        <text x={60} y={161} textAnchor="middle" fontSize={4.5} fill="#888" fontStyle="italic">{epitaph.substring(0,22)}</text>
+        {epitaph.length > 22 && <text x={60} y={167} textAnchor="middle" fontSize={4.5} fill="#888" fontStyle="italic">{epitaph.substring(22)}</text>}
+      </svg>
+    );
+  }
+
+  const groundY = 170 * sc;
   const bx = 58*sc, by = 120*sc, brx = 34*sc, bry = 30*sc;
-  const neckBaseX = bx - 10*sc, neckBaseY = by - bry + 4*sc;
+
+  // Body sinks when pct > 100
+  const bodySink = buriedBody * 40 * sc;
+
+  const neckBaseX = bx - 10*sc;
+  const neckBaseY = by - bry + 4*sc;
   const neckLen = 60*sc;
   const angleStart = -80*(Math.PI/180), angleEnd = -200*(Math.PI/180);
-  const neckAngle = angleStart + buried*(angleEnd - angleStart);
+  const neckAngle = angleStart + buried100*(angleEnd - angleStart);
   const neckTipX = neckBaseX + Math.cos(neckAngle)*neckLen;
   const neckTipY = neckBaseY + Math.sin(neckAngle)*neckLen;
   const headR = 16*sc;
   const headX = neckTipX + Math.cos(neckAngle)*headR*0.5;
   const headY = neckTipY + Math.sin(neckAngle)*headR*0.5;
-  const headBuried = headY + headR*0.5 > groundY;
+  const headBuried = headY + headR*0.5 > groundY || pct100 >= 100;
   const neckW = 9*sc, perp = neckAngle + Math.PI/2;
   const nx1=neckBaseX+Math.cos(perp)*neckW, ny1=neckBaseY+Math.sin(perp)*neckW;
   const nx2=neckBaseX-Math.cos(perp)*neckW, ny2=neckBaseY-Math.sin(perp)*neckW;
@@ -127,36 +187,98 @@ function OstrichSVG({ pct, feather, eyeColor, accessory, legStyle, size }) {
   const beakB1X=beakBaseX+headUpX*beakH*0.5, beakB1Y=beakBaseY+headUpY*beakH*0.5;
   const beakB2X=beakBaseX-headUpX*beakH*0.35, beakB2Y=beakBaseY-headUpY*beakH*0.35;
   const legLen=legStyle==="long"?52*sc:40*sc, legW=legStyle==="chunky"?5*sc:3.5*sc;
-  const leg1X=bx-8*sc, leg2X=bx+6*sc, legTopY=by+bry-4*sc;
-  const leg1BotY=legTopY+legLen, leg2BotY=legTopY+legLen*0.92;
-  const tailX=bx+brx-4*sc, tailY=by-6*sc;
-  const wingHX=bx+8*sc, wingHY=by-8*sc;
-  const sandDepth=Math.max(0,(buried-0.25)/0.75)*28*sc;
-  const holeVisible=buried>0.25;
+  const leg1X=bx-8*sc, leg2X=bx+6*sc;
+  const legTopY=by+bry-4*sc+bodySink;
+  const leg1BotY=legTopY+legLen-bodySink, leg2BotY=legTopY+legLen*0.92-bodySink;
+  const tailX=bx+brx-4*sc, tailY=by-6*sc+bodySink;
+  const wingHX=bx+8*sc, wingHY=by-8*sc+bodySink;
+  const sandDepth=Math.max(0,(buried100-0.25)/0.75)*28*sc;
+  const holeVisible=buried100>0.25;
   const svgH=Math.max(leg1BotY+18, groundY+18);
+
+  // Body position adjusted for sinking
+  const bodyY = by + bodySink;
+  const bodyNeckBaseY = bodyY - bry + 4*sc;
+
+  const hasAcc = (v) => accessories.includes(v);
+
   return (
     <svg width="100%" viewBox={`0 0 ${W*sc} ${svgH}`} style={{overflow:"visible",display:"block"}}>
       <ellipse cx={bx} cy={groundY+4} rx={42*sc} ry={7*sc} fill="#c8a96e" opacity="0.3"/>
       <rect x={0} y={groundY} width={W*sc} height={14*sc} fill="#c8a96e" opacity="0.18" rx={3}/>
+
+      {/* Tail */}
       {[0,1,2].map(i=><ellipse key={i} cx={tailX+i*4*sc} cy={tailY-i*3*sc} rx={12*sc} ry={7*sc} fill={feather.wing} transform={`rotate(${-30+i*15},${tailX+i*4*sc},${tailY-i*3*sc})`} opacity={0.95-i*0.1}/>)}
       {[0,1,2].map(i=><ellipse key={i} cx={tailX+i*4*sc+Math.cos((-30+i*15)*Math.PI/180)*8*sc} cy={tailY-i*3*sc+Math.sin((-30+i*15)*Math.PI/180)*3*sc} rx={5*sc} ry={3.5*sc} fill={feather.body} transform={`rotate(${-30+i*15},${tailX+i*4*sc},${tailY-i*3*sc})`} opacity={0.4}/>)}
+
+      {/* Legs */}
       <line x1={leg1X} y1={legTopY} x2={leg1X-3*sc} y2={leg1BotY} stroke="#E88070" strokeWidth={legW} strokeLinecap="round"/>
       <line x1={leg2X} y1={legTopY} x2={leg2X+2*sc} y2={leg2BotY} stroke="#E88070" strokeWidth={legW} strokeLinecap="round"/>
       {[[-10*sc,4*sc],[-3*sc,6*sc],[4*sc,5*sc]].map(([dx,dy],i)=><line key={i} x1={leg1X-3*sc} y1={leg1BotY} x2={leg1X-3*sc+dx} y2={leg1BotY+dy} stroke="#E88070" strokeWidth={legW*0.7} strokeLinecap="round"/>)}
       {[[-6*sc,5*sc],[2*sc,7*sc],[9*sc,4*sc]].map(([dx,dy],i)=><line key={i} x1={leg2X+2*sc} y1={leg2BotY} x2={leg2X+2*sc+dx} y2={leg2BotY+dy} stroke="#E88070" strokeWidth={legW*0.7} strokeLinecap="round"/>)}
-      <ellipse cx={bx} cy={by} rx={brx} ry={bry} fill={feather.body}/>
-      <ellipse cx={bx-8*sc} cy={by-10*sc} rx={14*sc} ry={8*sc} fill="white" opacity="0.08"/>
+
+      {/* Flip flops under feet */}
+      {hasAcc("flipflops")&&<g>
+        <ellipse cx={leg1X-10*sc} cy={leg1BotY+5*sc} rx={9*sc} ry={3.5*sc} fill="#FF6B6B" opacity="0.9"/>
+        <ellipse cx={leg2X+4*sc} cy={leg2BotY+5*sc} rx={9*sc} ry={3.5*sc} fill="#4ECDC4" opacity="0.9"/>
+        <line x1={leg1X-10*sc} y1={leg1BotY+2*sc} x2={leg1X-5*sc} y2={leg1BotY-1*sc} stroke="#FF6B6B" strokeWidth={2*sc}/>
+        <line x1={leg2X+4*sc} y1={leg2BotY+2*sc} x2={leg2X+9*sc} y2={leg2BotY-1*sc} stroke="#4ECDC4" strokeWidth={2*sc}/>
+      </g>}
+
+      {/* Body */}
+      <ellipse cx={bx} cy={bodyY} rx={brx} ry={bry} fill={feather.body}/>
+      <ellipse cx={bx-8*sc} cy={bodyY-10*sc} rx={14*sc} ry={8*sc} fill="white" opacity="0.08"/>
       <ellipse cx={wingHX} cy={wingHY} rx={18*sc} ry={10*sc} fill={feather.wing} opacity="0.25" transform={`rotate(-15,${wingHX},${wingHY})`}/>
+
+      {/* Sand cover for body sinking */}
+      {pct > 100 && <rect x={0} y={groundY} width={W*sc} height={bodySink+10} fill="#c8a96e" opacity="0.7"/>}
+
+      {/* Coconut bra on chest */}
+      {hasAcc("coconutbra")&&<g>
+        <ellipse cx={bx-11*sc} cy={bodyY-6*sc} rx={9*sc} ry={7*sc} fill="#7a5230"/>
+        <ellipse cx={bx+9*sc} cy={bodyY-6*sc} rx={9*sc} ry={7*sc} fill="#7a5230"/>
+        <ellipse cx={bx-11*sc} cy={bodyY-6*sc} rx={7*sc} ry={5.5*sc} fill="#5C3A1E"/>
+        <ellipse cx={bx+9*sc} cy={bodyY-6*sc} rx={7*sc} ry={5.5*sc} fill="#5C3A1E"/>
+        <line x1={bx-11*sc} y1={bodyY-12*sc} x2={neckBaseX-2*sc} y2={bodyNeckBaseY+8*sc} stroke="#7a5230" strokeWidth={2*sc}/>
+        <line x1={bx+9*sc} y1={bodyY-12*sc} x2={neckBaseX+4*sc} y2={bodyNeckBaseY+8*sc} stroke="#7a5230" strokeWidth={2*sc}/>
+      </g>}
+
+      {/* Neck */}
       <polygon points={`${nx1},${ny1} ${nx2},${ny2} ${nx3},${ny3} ${nx4},${ny4}`} fill={feather.neck}/>
       <ellipse cx={(nx1+nx4)/2} cy={(ny1+ny4)/2} rx={neckW*0.4} ry={neckLen*0.3} fill="white" opacity="0.12" transform={`rotate(${neckAngle*180/Math.PI},${(nx1+nx4)/2},${(ny1+ny4)/2})`}/>
       <ellipse cx={patchX} cy={patchY} rx={8*sc} ry={6*sc} fill={feather.wing} opacity="0.7"/>
+
+      {/* Bow tie at neck/body junction */}
+      {hasAcc("bowtie")&&<g>
+        <polygon points={`${neckBaseX-9*sc},${bodyNeckBaseY+2*sc} ${neckBaseX},${bodyNeckBaseY+8*sc} ${neckBaseX-9*sc},${bodyNeckBaseY+14*sc}`} fill="#D4537E"/>
+        <polygon points={`${neckBaseX+9*sc},${bodyNeckBaseY+2*sc} ${neckBaseX},${bodyNeckBaseY+8*sc} ${neckBaseX+9*sc},${bodyNeckBaseY+14*sc}`} fill="#D4537E"/>
+        <circle cx={neckBaseX} cy={bodyNeckBaseY+8*sc} r={3*sc} fill="#993556"/>
+      </g>}
+
+      {/* Lei around neck base */}
+      {hasAcc("lei")&&<g>
+        {[0,1,2,3,4,5,6,7].map(i=>{
+          const a=(i/8)*Math.PI*2;
+          const lx=neckBaseX+Math.cos(a)*11*sc;
+          const ly=bodyNeckBaseY+16*sc+Math.sin(a)*4*sc;
+          const colors=["#FF6B6B","#FFD93D","#FF8E53","#C77DFF","#FF6B9D","#4ECDC4","#FF6B6B","#FFD93D"];
+          return <g key={i}><circle cx={lx} cy={ly} r={3.5*sc} fill={colors[i]} opacity="0.95"/><circle cx={lx} cy={ly} r={1.2*sc} fill="#fff" opacity="0.6"/></g>;
+        })}
+        <ellipse cx={neckBaseX} cy={bodyNeckBaseY+16*sc} rx={11*sc} ry={4*sc} fill="none" stroke="#2d8a4e" strokeWidth={1.5*sc} opacity="0.5"/>
+      </g>}
+
+      {/* Head */}
       {!headBuried && (
         <g>
           <circle cx={headX} cy={headY} r={headR} fill={feather.neck}/>
           <ellipse cx={headX-headR*0.2} cy={headY-headR*0.3} rx={headR*0.35} ry={headR*0.25} fill="white" opacity="0.15"/>
+
+          {/* Beak */}
           <polygon points={`${beakB1X},${beakB1Y} ${beakTipX+faceDy*2*sc},${beakTipY-faceDx*2*sc} ${beakB2X},${beakB2Y}`} fill="#c86020"/>
           <polygon points={`${beakB1X},${beakB1Y} ${beakTipX},${beakTipY} ${beakB2X-headUpX*2*sc},${beakB2Y-headUpY*2*sc}`} fill={feather.beak}/>
           <line x1={beakBaseX} y1={beakBaseY} x2={beakTipX} y2={beakTipY} stroke="#c86020" strokeWidth={1} opacity="0.5"/>
+
+          {/* Eye */}
           <circle cx={eyeX} cy={eyeY} r={6*sc} fill="white"/>
           <circle cx={eyeX+0.5*sc} cy={eyeY+0.5*sc} r={4*sc} fill={eyeColor}/>
           <circle cx={eyeX+0.8*sc} cy={eyeY+0.8*sc} r={2*sc} fill="#1a1a1a"/>
@@ -167,73 +289,163 @@ function OstrichSVG({ pct, feather, eyeColor, accessory, legStyle, size }) {
             const lx2=lx1+Math.cos(la-0.3)*5*sc, ly2=ly1+Math.sin(la-0.3)*5*sc;
             return <line key={i} x1={lx1} y1={ly1} x2={lx2} y2={ly2} stroke="#1a1a1a" strokeWidth={1.2*sc} strokeLinecap="round"/>;
           })}
-          {accessory==="tophat"&&<g><rect x={headX-11*sc} y={headY-headR-22*sc} width={22*sc} height={18*sc} rx={2} fill="#1a1a1a"/><rect x={headX-15*sc} y={headY-headR-5*sc} width={30*sc} height={5*sc} rx={2} fill="#1a1a1a"/><rect x={headX-10*sc} y={headY-headR-22*sc} width={22*sc} height={3*sc} rx={1} fill="#D4537E" opacity="0.8"/></g>}
-          {accessory==="sunglasses"&&<g><rect x={eyeX-8*sc} y={eyeY-5*sc} width={10*sc} height={8*sc} rx={3} fill="#1a1a1a" opacity="0.85"/><rect x={eyeX+4*sc} y={eyeY-5*sc} width={10*sc} height={8*sc} rx={3} fill="#1a1a1a" opacity="0.85"/><line x1={eyeX+2*sc} y1={eyeY-2*sc} x2={eyeX+4*sc} y2={eyeY-2*sc} stroke="#1a1a1a" strokeWidth={1.5*sc}/><line x1={eyeX-8*sc} y1={eyeY-2*sc} x2={eyeX-12*sc} y2={eyeY} stroke="#1a1a1a" strokeWidth={1.5*sc}/></g>}
-          {accessory==="partyhat"&&<g><polygon points={`${headX-12*sc},${headY-headR+2} ${headX+12*sc},${headY-headR+2} ${headX+2*sc},${headY-headR-26*sc}`} fill="#D4537E"/><polygon points={`${headX-12*sc},${headY-headR+2} ${headX+12*sc},${headY-headR+2} ${headX+2*sc},${headY-headR-26*sc}`} fill="none" stroke="#FAC775" strokeWidth={1} strokeDasharray="3,3"/><circle cx={headX+2*sc} cy={headY-headR-26*sc} r={4*sc} fill="#FAC775"/></g>}
-          {accessory==="crown"&&<g><polygon points={`${headX-13*sc},${headY-headR} ${headX-13*sc},${headY-headR-14*sc} ${headX-6*sc},${headY-headR-8*sc} ${headX},${headY-headR-16*sc} ${headX+6*sc},${headY-headR-8*sc} ${headX+13*sc},${headY-headR-14*sc} ${headX+13*sc},${headY-headR}`} fill="#EF9F27" stroke="#BA7517" strokeWidth={0.5}/>{[-8,0,8].map((dx,i)=><circle key={i} cx={headX+dx*sc} cy={headY-headR-2*sc} r={2.5*sc} fill="#D85A30"/>)}</g>}
-          {accessory==="bowtie"&&<g><polygon points={`${neckBaseX-10*sc},${neckBaseY+6*sc} ${neckBaseX},${neckBaseY+12*sc} ${neckBaseX-10*sc},${neckBaseY+18*sc}`} fill="#D4537E"/><polygon points={`${neckBaseX+10*sc},${neckBaseY+6*sc} ${neckBaseX},${neckBaseY+12*sc} ${neckBaseX+10*sc},${neckBaseY+18*sc}`} fill="#D4537E"/><circle cx={neckBaseX} cy={neckBaseY+12*sc} r={3*sc} fill="#993556"/></g>}
 
-          {/* Lei — colorful flowers around the neck base */}
-          {accessory==="lei"&&<g>
-            {[0,1,2,3,4,5,6,7].map(i=>{
-              const a=(i/8)*Math.PI*2;
-              const lx=neckBaseX+Math.cos(a)*12*sc, ly=neckBaseY+8*sc+Math.sin(a)*5*sc;
-              const colors=["#FF6B6B","#FFD93D","#FF8E53","#C77DFF","#FF6B9D","#4ECDC4","#FF6B6B","#FFD93D"];
-              return <g key={i}><circle cx={lx} cy={ly} r={4*sc} fill={colors[i]} opacity="0.9"/><circle cx={lx} cy={ly} r={1.5*sc} fill="#fff" opacity="0.7"/></g>;
-            })}
-            <ellipse cx={neckBaseX} cy={neckBaseY+8*sc} rx={12*sc} ry={5*sc} fill="none" stroke="#2d8a4e" strokeWidth={2*sc} opacity="0.6"/>
+          {/* Sunglasses: single wide lens + earpiece */}
+          {hasAcc("sunglasses")&&<g>
+            <rect x={eyeX-9*sc} y={eyeY-5*sc} width={16*sc} height={9*sc} rx={4} fill="#1a1a1a" opacity="0.85"/>
+            <line x1={eyeX+7*sc} y1={eyeY-1*sc} x2={headX+headR-1} y2={eyeY+2*sc} stroke="#1a1a1a" strokeWidth={1.5*sc} strokeLinecap="round"/>
+            <line x1={eyeX-9*sc} y1={eyeY-1*sc} x2={headX-headR+2} y2={eyeY+3*sc} stroke="#1a1a1a" strokeWidth={1.5*sc} strokeLinecap="round"/>
           </g>}
 
-          {/* Coconut bra — two coconut halves on body */}
-          {accessory==="coconutbra"&&<g>
-            <ellipse cx={bx-10*sc} cy={by-8*sc} rx={10*sc} ry={8*sc} fill="#8B6343"/>
-            <ellipse cx={bx+10*sc} cy={by-8*sc} rx={10*sc} ry={8*sc} fill="#8B6343"/>
-            <ellipse cx={bx-10*sc} cy={by-8*sc} rx={8*sc} ry={6*sc} fill="#6B4A2A"/>
-            <ellipse cx={bx+10*sc} cy={by-8*sc} rx={8*sc} ry={6*sc} fill="#6B4A2A"/>
-            {/* Straps */}
-            <line x1={bx-10*sc} y1={by-14*sc} x2={neckBaseX-4*sc} y2={neckBaseY+10*sc} stroke="#8B6343" strokeWidth={2*sc}/>
-            <line x1={bx+10*sc} y1={by-14*sc} x2={neckBaseX+4*sc} y2={neckBaseY+10*sc} stroke="#8B6343" strokeWidth={2*sc}/>
+          {/* Top hat */}
+          {hasAcc("tophat")&&<g>
+            <rect x={headX-11*sc} y={headY-headR-22*sc} width={22*sc} height={18*sc} rx={2} fill="#1a1a1a"/>
+            <rect x={headX-15*sc} y={headY-headR-5*sc} width={30*sc} height={5*sc} rx={2} fill="#1a1a1a"/>
+            <rect x={headX-10*sc} y={headY-headR-22*sc} width={22*sc} height={3*sc} rx={1} fill="#D4537E" opacity="0.8"/>
           </g>}
 
-          {/* Wide brim hat — big floppy straw hat */}
-          {accessory==="widebrimhat"&&<g>
-            {/* Wide brim */}
+          {/* Party hat */}
+          {hasAcc("partyhat")&&<g>
+            <polygon points={`${headX-12*sc},${headY-headR+2} ${headX+12*sc},${headY-headR+2} ${headX+2*sc},${headY-headR-26*sc}`} fill="#D4537E"/>
+            <polygon points={`${headX-12*sc},${headY-headR+2} ${headX+12*sc},${headY-headR+2} ${headX+2*sc},${headY-headR-26*sc}`} fill="none" stroke="#FAC775" strokeWidth={1} strokeDasharray="3,3"/>
+            <circle cx={headX+2*sc} cy={headY-headR-26*sc} r={4*sc} fill="#FAC775"/>
+          </g>}
+
+          {/* Crown */}
+          {hasAcc("crown")&&<g>
+            <polygon points={`${headX-13*sc},${headY-headR} ${headX-13*sc},${headY-headR-14*sc} ${headX-6*sc},${headY-headR-8*sc} ${headX},${headY-headR-16*sc} ${headX+6*sc},${headY-headR-8*sc} ${headX+13*sc},${headY-headR-14*sc} ${headX+13*sc},${headY-headR}`} fill="#EF9F27" stroke="#BA7517" strokeWidth={0.5}/>
+            {[-8,0,8].map((dx,i)=><circle key={i} cx={headX+dx*sc} cy={headY-headR-2*sc} r={2.5*sc} fill="#D85A30"/>)}
+          </g>}
+
+          {/* Wide brim hat */}
+          {hasAcc("widebrimhat")&&<g>
             <ellipse cx={headX+2*sc} cy={headY-headR+2*sc} rx={28*sc} ry={7*sc} fill="#D4A853"/>
-            <ellipse cx={headX+2*sc} cy={headY-headR+2*sc} rx={28*sc} ry={7*sc} fill="none" stroke="#B8832A" strokeWidth={1*sc}/>
-            {/* Crown */}
             <ellipse cx={headX+2*sc} cy={headY-headR-8*sc} rx={14*sc} ry={11*sc} fill="#D4A853"/>
             <ellipse cx={headX+2*sc} cy={headY-headR+2*sc} rx={14*sc} ry={5*sc} fill="#C49040"/>
-            {/* Hat band */}
             <ellipse cx={headX+2*sc} cy={headY-headR-2*sc} rx={14*sc} ry={4*sc} fill="none" stroke="#E8762A" strokeWidth={3*sc}/>
-            {/* Straw texture lines */}
             {[-1,0,1].map(i=><line key={i} x1={headX+2*sc-10*sc} y1={headY-headR-8*sc+i*4*sc} x2={headX+2*sc+10*sc} y2={headY-headR-8*sc+i*4*sc} stroke="#B8832A" strokeWidth={0.5*sc} opacity="0.5"/>)}
           </g>}
 
-          {/* Flip flops — on feet */}
-          {accessory==="flipflops"&&<g>
-            <ellipse cx={leg1X-10*sc} cy={leg1BotY+6*sc} rx={9*sc} ry={4*sc} fill="#FF6B6B" opacity="0.9"/>
-            <ellipse cx={leg2X+4*sc} cy={leg2BotY+6*sc} rx={9*sc} ry={4*sc} fill="#4ECDC4" opacity="0.9"/>
-            <line x1={leg1X-10*sc} y1={leg1BotY+3*sc} x2={leg1X-6*sc} y2={leg1BotY} stroke="#FF6B6B" strokeWidth={2*sc}/>
-            <line x1={leg2X+4*sc} y1={leg2BotY+3*sc} x2={leg2X+8*sc} y2={leg2BotY} stroke="#4ECDC4" strokeWidth={2*sc}/>
-          </g>}
-
-          {/* Snorkel — mask on face + tube */}
-          {accessory==="snorkel"&&<g>
-            {/* Mask */}
-            <ellipse cx={eyeX} cy={eyeY} r={8*sc} fill="#4ECDC4" opacity="0.5" stroke="#2B9E9E" strokeWidth={1.5*sc}/>
-            <ellipse cx={eyeX} cy={eyeY} r={6*sc} fill="none" stroke="#2B9E9E" strokeWidth={1*sc}/>
-            {/* Tube going up */}
-            <path d={`M ${headX+Math.cos(neckAngle-0.8)*headR} ${headY+Math.sin(neckAngle-0.8)*headR} Q ${headX+Math.cos(neckAngle-0.8)*headR+10*sc} ${headY+Math.sin(neckAngle-0.8)*headR-20*sc} ${headX+Math.cos(neckAngle-0.8)*headR+8*sc} ${headY+Math.sin(neckAngle-0.8)*headR-30*sc}`} fill="none" stroke="#FF6B6B" strokeWidth={3*sc} strokeLinecap="round"/>
-            {/* Mouthpiece tip */}
-            <circle cx={headX+Math.cos(neckAngle-0.8)*headR+8*sc} cy={headY+Math.sin(neckAngle-0.8)*headR-30*sc} r={3*sc} fill="#FF6B6B"/>
+          {/* Snorkel: mask over eye + tube arcing from side of head */}
+          {hasAcc("snorkel")&&<g>
+            <rect x={eyeX-9*sc} y={eyeY-6*sc} width={16*sc} height={11*sc} rx={5} fill="#4ECDC4" opacity="0.6" stroke="#2B9E9E" strokeWidth={1.5*sc}/>
+            {/* tube from side of head going up */}
+            <path d={`M ${headX-Math.cos(neckAngle)*headR*0.7} ${headY-Math.sin(neckAngle)*headR*0.3} C ${headX-headR*1.5} ${headY-headR*1.5} ${headX-headR} ${headY-headR*3} ${headX-headR*0.5} ${headY-headR*3.5}`} fill="none" stroke="#FF6B6B" strokeWidth={3*sc} strokeLinecap="round"/>
+            <circle cx={headX-headR*0.5} cy={headY-headR*3.5} r={3*sc} fill="#FF6B6B"/>
           </g>}
         </g>
       )}
-      {holeVisible&&<><ellipse cx={neckTipX} cy={groundY} rx={16*sc*Math.min(1,(buried-0.25)/0.5)} ry={5*sc*Math.min(1,(buried-0.25)/0.5)} fill="#b8945e" opacity="0.9"/>{buried>0.5&&<ellipse cx={neckTipX} cy={groundY+2} rx={18*sc} ry={sandDepth*0.5} fill="#c8a96e" opacity="0.85"/>}</>}
+
+      {/* Sand hole */}
+      {holeVisible&&<><ellipse cx={neckTipX} cy={groundY} rx={16*sc*Math.min(1,(buried100-0.25)/0.5)} ry={5*sc*Math.min(1,(buried100-0.25)/0.5)} fill="#b8945e" opacity="0.9"/>{buried100>0.5&&<ellipse cx={neckTipX} cy={groundY+2} rx={18*sc} ry={sandDepth*0.5} fill="#c8a96e" opacity="0.85"/>}</>}
     </svg>
   );
 }
 
+// ── ISLAND SCENE ─────────────────────────────────────────────────
+function IslandScene({ members, myId, onSelectMember, selectedMember }) {
+  const memberList = Object.values(members);
+  const count = memberList.length;
+  const islandW = Math.max(500, 160 + count * 120);
+  const islandH = 260;
+  const islandCX = islandW / 2;
+  const islandCY = 200;
+  const islandRX = islandW * 0.44;
+  const islandRY = 55;
+
+  // Positions: scatter ostriches across island with slight randomness, seeded by index
+  const getPos = (i, total) => {
+    const spread = islandRX * 0.78;
+    const step = total > 1 ? (spread * 2) / total : 0;
+    const baseX = islandCX - spread + step * i + step * 0.5;
+    // Slight vertical randomness based on index
+    const offY = ((i * 37 + 13) % 30) - 15;
+    return { x: baseX, y: islandCY - 30 + offY };
+  };
+
+  return (
+    <div style={{width:"100%",overflowX:"auto",marginBottom:"1.5rem"}}>
+      <svg width={islandW} height={islandH + 20} viewBox={`0 0 ${islandW} ${islandH + 20}`} style={{display:"block",margin:"0 auto",maxWidth:"100%"}}>
+        {/* Ocean */}
+        <rect x={0} y={0} width={islandW} height={islandH+20} fill="#64B5F6" rx={16}/>
+        {/* Ocean waves */}
+        {[0,1,2,3].map(i=>(
+          <ellipse key={i} cx={islandW*0.15+i*islandW*0.22} cy={islandH*0.25+i*8} rx={islandW*0.12} ry={8} fill="#90CAF9" opacity="0.4"/>
+        ))}
+
+        {/* Island sand */}
+        <ellipse cx={islandCX} cy={islandCY+10} rx={islandRX} ry={islandRY} fill="#F5DEB3"/>
+        <ellipse cx={islandCX} cy={islandCY+5} rx={islandRX*0.95} ry={islandRY*0.8} fill="#EDD8A0"/>
+        {/* Sand texture dots */}
+        {[...Array(12)].map((_,i)=>(
+          <circle key={i} cx={islandCX-islandRX*0.7+i*islandRX*0.13} cy={islandCY+12+(i%3)*6} r={2} fill="#D4A853" opacity="0.3"/>
+        ))}
+
+        {/* Starfish */}
+        <text x={islandCX-islandRX*0.6} y={islandCY+28} fontSize={14} opacity="0.7">⭐</text>
+        <text x={islandCX+islandRX*0.5} y={islandCY+32} fontSize={12} opacity="0.6">🐚</text>
+
+        {/* Palm tree 1 (left) */}
+        <line x1={islandCX-islandRX*0.7} y1={islandCY+8} x2={islandCX-islandRX*0.72} y2={islandCY-80} stroke="#8B6343" strokeWidth={6} strokeLinecap="round"/>
+        <ellipse cx={islandCX-islandRX*0.72} cy={islandCY-80} rx={28} ry={12} fill="#2E7D32" transform={`rotate(-20,${islandCX-islandRX*0.72},${islandCY-80})`}/>
+        <ellipse cx={islandCX-islandRX*0.72} cy={islandCY-80} rx={22} ry={10} fill="#388E3C" transform={`rotate(10,${islandCX-islandRX*0.72},${islandCY-80})`}/>
+        <ellipse cx={islandCX-islandRX*0.72} cy={islandCY-80} rx={18} ry={8} fill="#43A047" transform={`rotate(-35,${islandCX-islandRX*0.72},${islandCY-80})`}/>
+        {/* Coconuts */}
+        {[0,1,2].map(i=><circle key={i} cx={islandCX-islandRX*0.72+i*5-5} cy={islandCY-75} r={4} fill="#8B6343"/>)}
+
+        {/* Palm tree 2 (right) if island wide enough */}
+        {islandW > 400 && <>
+          <line x1={islandCX+islandRX*0.68} y1={islandCY+8} x2={islandCX+islandRX*0.71} y2={islandCY-70} stroke="#8B6343" strokeWidth={5} strokeLinecap="round"/>
+          <ellipse cx={islandCX+islandRX*0.71} cy={islandCY-70} rx={24} ry={10} fill="#2E7D32" transform={`rotate(15,${islandCX+islandRX*0.71},${islandCY-70})`}/>
+          <ellipse cx={islandCX+islandRX*0.71} cy={islandCY-70} rx={20} ry={9} fill="#388E3C" transform={`rotate(-10,${islandCX+islandRX*0.71},${islandCY-70})`}/>
+          {[0,1].map(i=><circle key={i} cx={islandCX+islandRX*0.71+i*4-2} cy={islandCY-65} r={3.5} fill="#8B6343"/>)}
+        </>}
+
+        {/* Hammock between trees if 2+ palms */}
+        {islandW > 400 && <>
+          <path d={`M ${islandCX-islandRX*0.68} ${islandCY-40} Q ${islandCX} ${islandCY-20} ${islandCX+islandRX*0.67} ${islandCY-40}`} fill="none" stroke="#E8762A" strokeWidth={4} strokeLinecap="round" opacity="0.8"/>
+          <path d={`M ${islandCX-islandRX*0.68} ${islandCY-50} Q ${islandCX} ${islandCY-30} ${islandCX+islandRX*0.67} ${islandCY-50}`} fill="none" stroke="#E8762A" strokeWidth={4} strokeLinecap="round" opacity="0.8"/>
+          {/* Hammock ropes */}
+          <line x1={islandCX-islandRX*0.72} y1={islandCY-55} x2={islandCX-islandRX*0.68} y2={islandCY-40} stroke="#C4963C" strokeWidth={1.5} opacity="0.7"/>
+          <line x1={islandCX+islandRX*0.71} y1={islandCY-50} x2={islandCX+islandRX*0.67} y2={islandCY-40} stroke="#C4963C" strokeWidth={1.5} opacity="0.7"/>
+        </>}
+
+        {/* Ostriches */}
+        {memberList.map((member, i) => {
+          const pos = getPos(i, count);
+          const f = FEATHER_COLORS[member.customization?.feather ?? 0];
+          const e = EYE_COLORS[member.customization?.eye ?? 0];
+          const accs = member.customization?.accessories ?? [];
+          const leg = member.customization?.legStyle ?? "normal";
+          const sz = SIZE_OPTIONS[member.customization?.size ?? 1].scale * 0.7;
+          const ostW = 80;
+          const ostH = 140;
+          const isMe = member.id === myId;
+          const isSelected = selectedMember === member.id;
+          return (
+            <g key={member.id} onClick={() => onSelectMember(member.id === selectedMember ? null : member.id)} style={{cursor:"pointer"}}>
+              {(isSelected || isMe) && <ellipse cx={pos.x} cy={pos.y+ostH*0.5} rx={ostW*0.5} ry={8} fill={isMe?"#534AB7":"#FFD93D"} opacity="0.35"/>}
+              <foreignObject x={pos.x - ostW/2} y={pos.y - ostH*0.3} width={ostW} height={ostH}>
+                <div xmlns="http://www.w3.org/1999/xhtml" style={{width:ostW,height:ostH}}>
+                  <OstrichSVG pct={member.pct} feather={f} eyeColor={e.color} accessories={accs} legStyle={leg} size={sz} name={member.name}/>
+                </div>
+              </foreignObject>
+              {/* Name label */}
+              <text x={pos.x} y={pos.y+ostH*0.55} textAnchor="middle" fontSize={10} fontWeight={isMe?"700":"500"} fill={isMe?"#534AB7":"#444"}>
+                {member.name}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Add teammate prompt if empty */}
+        {count === 0 && <text x={islandCX} y={islandCY} textAnchor="middle" fontSize={13} fill="#aaa">No ostriches yet!</text>}
+      </svg>
+    </div>
+  );
+}
+
+// ── APP ──────────────────────────────────────────────────────────
 const { useState, useEffect, useRef } = React;
 
 function App() {
@@ -259,14 +471,12 @@ function App() {
   const [recentRooms, setRecentRooms] = useState([]);
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
+  const [selectedMember, setSelectedMember] = useState(null);
   const dbRefRef = useRef(null);
   const chatEndRef = useRef(null);
   const today = new Date().toDateString();
 
-  const loadRecentRooms = () => {
-    try { return JSON.parse(localStorage.getItem("ostrich_recent") || "[]"); } catch { return []; }
-  };
-
+  const loadRecentRooms = () => { try { return JSON.parse(localStorage.getItem("ostrich_recent") || "[]"); } catch { return []; } };
   const saveRecentRoom = (code, name, mName, mId) => {
     try {
       const rooms = loadRecentRooms().filter(r => r.code !== code);
@@ -293,31 +503,19 @@ function App() {
     } catch {}
   }, []);
 
-  // Scroll chat to bottom on new messages
-  useEffect(() => {
-    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  useEffect(() => { if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   useEffect(() => {
     if (view !== "room" || !roomCode || !USING_FIREBASE) return;
     if (dbRefRef.current) dbRefRef.current.off();
-
-    // Members listener
     const ref = db.ref(`rooms/${roomCode}/members`);
     dbRefRef.current = ref;
     ref.on("value", snap => { setMembers(snap.val() || {}); });
-
-    // Admin listener
     db.ref(`rooms/${roomCode}/createdBy`).on("value", snap => {
       const creator = snap.val() || null;
       setRoomCreatedBy(creator);
-      if (creator && creator === myId) {
-        setIsAdmin(true);
-        saveSession(roomCode, myId, myName, roomName, true);
-      }
+      if (creator && creator === myId) { setIsAdmin(true); saveSession(roomCode, myId, myName, roomName, true); }
     });
-
-    // Room deletion listener
     db.ref(`rooms/${roomCode}`).on("value", snap => {
       if (snap.exists() && snap.val() === null) {
         localStorage.removeItem("ostrich_session");
@@ -325,13 +523,10 @@ function App() {
         setIsAdmin(false); setMessages([]); setRecentRooms(loadRecentRooms()); setView("home");
       }
     });
-
-    // Chat listener — last 100 messages
     db.ref(`rooms/${roomCode}/chat`).limitToLast(100).on("value", snap => {
       const val = snap.val();
       setMessages(val ? Object.values(val).sort((a, b) => a.ts - b.ts) : []);
     });
-
     return () => { if (dbRefRef.current) dbRefRef.current.off(); };
   }, [view, roomCode]);
 
@@ -349,9 +544,7 @@ function App() {
     saveRecentRoom(code, rName, myName.trim(), id);
     if (USING_FIREBASE) {
       db.ref(`rooms/${code}`).set({ name: rName, createdBy: id, date: today, members: { [id]: { id, name: myName.trim(), pct: 0, customization: DEFAULT_CUSTOMIZATION } } });
-    } else {
-      setMembers({ [id]: { id, name: myName.trim(), pct: 0, customization: DEFAULT_CUSTOMIZATION } });
-    }
+    } else { setMembers({ [id]: { id, name: myName.trim(), pct: 0, customization: DEFAULT_CUSTOMIZATION } }); }
   };
 
   const joinRoom = (code, name, existingId) => {
@@ -365,27 +558,14 @@ function App() {
     if (USING_FIREBASE) {
       db.ref(`rooms/${resolvedCode}/name`).once("value", snap => {
         const rName = snap.val() || resolvedCode;
-        setRoomName(rName);
-        saveSession(resolvedCode, id, resolvedName, rName, false);
-        saveRecentRoom(resolvedCode, rName, resolvedName, id);
-      }).catch(() => {
-        setRoomName(resolvedCode);
-        saveSession(resolvedCode, id, resolvedName, resolvedCode, false);
-        saveRecentRoom(resolvedCode, resolvedCode, resolvedName, id);
-      });
-    } else {
-      saveSession(resolvedCode, id, resolvedName, resolvedCode, false);
-      saveRecentRoom(resolvedCode, resolvedCode, resolvedName, id);
-    }
+        setRoomName(rName); saveSession(resolvedCode, id, resolvedName, rName, false); saveRecentRoom(resolvedCode, rName, resolvedName, id);
+      }).catch(() => { setRoomName(resolvedCode); saveSession(resolvedCode, id, resolvedName, resolvedCode, false); saveRecentRoom(resolvedCode, resolvedCode, resolvedName, id); });
+    } else { saveSession(resolvedCode, id, resolvedName, resolvedCode, false); saveRecentRoom(resolvedCode, resolvedCode, resolvedName, id); }
     if (!existingId) {
       const attemptWrite = (attempts) => {
         if (attempts <= 0) return;
-        if (USING_FIREBASE) {
-          db.ref(`rooms/${resolvedCode}/members/${id}`).set({ id, name: resolvedName, pct: 0, customization: DEFAULT_CUSTOMIZATION })
-            .catch(() => setTimeout(() => attemptWrite(attempts - 1), 2000));
-        } else {
-          setMembers(prev => ({ ...prev, [id]: { id, name: resolvedName, pct: 0, customization: DEFAULT_CUSTOMIZATION } }));
-        }
+        if (USING_FIREBASE) { db.ref(`rooms/${resolvedCode}/members/${id}`).set({ id, name: resolvedName, pct: 0, customization: DEFAULT_CUSTOMIZATION }).catch(() => setTimeout(() => attemptWrite(attempts - 1), 2000)); }
+        else { setMembers(prev => ({ ...prev, [id]: { id, name: resolvedName, pct: 0, customization: DEFAULT_CUSTOMIZATION } })); }
       };
       attemptWrite(3);
     }
@@ -396,11 +576,8 @@ function App() {
     if (!text || !myId || !myName) return;
     const msgId = `m_${Date.now()}`;
     const msg = { id: msgId, userId: myId, name: myName, text, ts: Date.now() };
-    if (USING_FIREBASE) {
-      db.ref(`rooms/${roomCode}/chat/${msgId}`).set(msg);
-    } else {
-      setMessages(prev => [...prev, msg]);
-    }
+    if (USING_FIREBASE) { db.ref(`rooms/${roomCode}/chat/${msgId}`).set(msg); }
+    else { setMessages(prev => [...prev, msg]); }
     setChatInput("");
   };
 
@@ -411,10 +588,7 @@ function App() {
 
   const claimAdmin = () => {
     if (!USING_FIREBASE || !myId) return;
-    db.ref(`rooms/${roomCode}/createdBy`).transaction(existing => {
-      if (existing) return;
-      return myId;
-    }, (err, committed) => {
+    db.ref(`rooms/${roomCode}/createdBy`).transaction(existing => { if (existing) return; return myId; }, (err, committed) => {
       if (committed) { setIsAdmin(true); setRoomCreatedBy(myId); saveSession(roomCode, myId, myName, roomName, true); }
     });
   };
@@ -424,22 +598,15 @@ function App() {
     if (!newName) { setEditingRoomName(false); return; }
     setRoomName(newName); setEditingRoomName(false);
     if (USING_FIREBASE) db.ref(`rooms/${roomCode}/name`).set(newName);
-    try {
-      const updated = loadRecentRooms().map(r => r.code === roomCode ? { ...r, name: newName } : r);
-      localStorage.setItem("ostrich_recent", JSON.stringify(updated));
-    } catch {}
+    try { const updated = loadRecentRooms().map(r => r.code === roomCode ? { ...r, name: newName } : r); localStorage.setItem("ostrich_recent", JSON.stringify(updated)); } catch {}
     saveSession(roomCode, myId, myName, newName, isAdmin);
   };
 
   const deleteRoom = () => {
     if (USING_FIREBASE) db.ref(`rooms/${roomCode}`).remove();
-    try {
-      const updated = loadRecentRooms().filter(r => r.code !== roomCode);
-      localStorage.setItem("ostrich_recent", JSON.stringify(updated));
-    } catch {}
+    try { const updated = loadRecentRooms().filter(r => r.code !== roomCode); localStorage.setItem("ostrich_recent", JSON.stringify(updated)); } catch {}
     localStorage.removeItem("ostrich_session");
-    setMembers({}); setMyId(null); setRoomCode(""); setRoomName("");
-    setIsAdmin(false); setConfirmDelete(false); setMessages([]);
+    setMembers({}); setMyId(null); setRoomCode(""); setRoomName(""); setIsAdmin(false); setConfirmDelete(false); setMessages([]);
     setRecentRooms(loadRecentRooms()); setView("home");
   };
 
@@ -461,37 +628,23 @@ function App() {
   const removeMember = (id) => {
     if (id === myId) {
       if (USING_FIREBASE) db.ref(`rooms/${roomCode}/members/${myId}`).remove();
-      localStorage.removeItem("ostrich_session");
-      setMembers({}); setMyId(null); setRoomCode(""); setIsAdmin(false); setView("home"); return;
+      localStorage.removeItem("ostrich_session"); setMembers({}); setMyId(null); setRoomCode(""); setIsAdmin(false); setView("home"); return;
     }
     if (USING_FIREBASE) db.ref(`rooms/${roomCode}/members/${id}`).remove();
     else setMembers(prev => { const n = {...prev}; delete n[id]; return n; });
   };
 
-  const copyCode = () => {
-    try { navigator.clipboard.writeText(roomCode); } catch {}
-    setCopied(true); setTimeout(() => setCopied(false), 2000);
-  };
-
-  const copyJoinLink = () => {
-    const base = window.location.href.split("?")[0];
-    try { navigator.clipboard.writeText(`${base}?room=${roomCode}`); } catch {}
-    setCopiedLink(true); setTimeout(() => setCopiedLink(false), 2000);
-  };
-
-  const switchRoom = () => {
-    localStorage.removeItem("ostrich_session");
-    setRoomCode(""); setMyId(null); setMembers({});
-    setRoomName(""); setIsAdmin(false); setMessages([]);
-    setRecentRooms(loadRecentRooms()); setView("home");
-  };
+  const copyCode = () => { try { navigator.clipboard.writeText(roomCode); } catch {} setCopied(true); setTimeout(() => setCopied(false), 2000); };
+  const copyJoinLink = () => { const base = window.location.href.split("?")[0]; try { navigator.clipboard.writeText(`${base}?room=${roomCode}`); } catch {} setCopiedLink(true); setTimeout(() => setCopiedLink(false), 2000); };
+  const switchRoom = () => { localStorage.removeItem("ostrich_session"); setRoomCode(""); setMyId(null); setMembers({}); setRoomName(""); setIsAdmin(false); setMessages([]); setRecentRooms(loadRecentRooms()); setView("home"); };
 
   const memberList = Object.values(members);
   const me = members[myId];
   const myLabel = me ? getLabel(me.pct) : null;
+  const selMember = selectedMember ? members[selectedMember] : null;
 
   const s = {
-    page: { padding: "2rem 1rem", maxWidth: 480, margin: "0 auto" },
+    page: { padding: "2rem 1rem", maxWidth: 520, margin: "0 auto" },
     card: { background: "#fff", borderRadius: 12, border: "1px solid #e5e5e5", padding: "1rem 1.25rem", marginBottom: "1rem" },
     h1: { fontSize: 22, fontWeight: 600, margin: "0 0 6px" },
     h2: { fontSize: 18, fontWeight: 600, margin: "0 0 1.5rem" },
@@ -503,10 +656,11 @@ function App() {
     error: { color: "#c0392b", fontSize: 13, marginBottom: 12 },
   };
 
+  // ── HOME ──
   if (view === "home") return (
     <div style={{...s.page, textAlign:"center"}}>
       <div style={{width:130,margin:"0 auto 8px"}}>
-        <OstrichSVG pct={0} feather={FEATHER_COLORS[0]} eyeColor={EYE_COLORS[0].color} accessory="none" legStyle="normal" size={1}/>
+        <OstrichSVG pct={0} feather={FEATHER_COLORS[0]} eyeColor={EYE_COLORS[0].color} accessories={[]} legStyle="normal" size={1} name=""/>
       </div>
       <h1 style={s.h1}>Ostrich-O-Meter</h1>
       <p style={{color:"#888",fontSize:14,margin:"0 0 2rem"}}>Team check-in, one buried head at a time</p>
@@ -514,12 +668,8 @@ function App() {
         <div style={{marginBottom:"1.5rem",textAlign:"left"}}>
           <p style={{fontSize:12,color:"#888",marginBottom:8,fontWeight:500}}>Recent rooms</p>
           {recentRooms.map(r => (
-            <div key={r.code} onClick={()=>joinRoom(r.code, r.myName, r.myId)}
-              style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",background:"#fff",border:"1px solid #e5e5e5",borderRadius:8,marginBottom:6,cursor:"pointer"}}>
-              <div>
-                <p style={{fontSize:14,fontWeight:500,margin:0}}>{r.name}</p>
-                <p style={{fontSize:11,color:"#aaa",margin:0}}>Code: {r.code} · as {r.myName}</p>
-              </div>
+            <div key={r.code} onClick={()=>joinRoom(r.code, r.myName, r.myId)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",background:"#fff",border:"1px solid #e5e5e5",borderRadius:8,marginBottom:6,cursor:"pointer"}}>
+              <div><p style={{fontSize:14,fontWeight:500,margin:0}}>{r.name}</p><p style={{fontSize:11,color:"#aaa",margin:0}}>Code: {r.code} · as {r.myName}</p></div>
               <span style={{fontSize:18,color:"#ccc"}}>›</span>
             </div>
           ))}
@@ -532,50 +682,49 @@ function App() {
     </div>
   );
 
+  // ── CREATE ──
   if (view === "create") return (
     <div style={s.page}>
       <button style={{...s.btnSmall,marginBottom:20}} onClick={()=>setView("home")}>← Back</button>
       <h2 style={s.h2}>Create a room</h2>
-      <div style={{marginBottom:12}}>
-        <label style={s.label}>Room name</label>
-        <input value={newRoomName} onChange={e=>setNewRoomName(e.target.value)} placeholder="e.g. Design Team"/>
-      </div>
-      <div style={{marginBottom:16}}>
-        <label style={s.label}>Your name</label>
-        <input value={myName} onChange={e=>setMyName(e.target.value)} placeholder="e.g. Jordan" onKeyDown={e=>e.key==="Enter"&&createRoom()}/>
-      </div>
+      <div style={{marginBottom:12}}><label style={s.label}>Room name</label><input value={newRoomName} onChange={e=>setNewRoomName(e.target.value)} placeholder="e.g. Design Team"/></div>
+      <div style={{marginBottom:16}}><label style={s.label}>Your name</label><input value={myName} onChange={e=>setMyName(e.target.value)} placeholder="e.g. Jordan" onKeyDown={e=>e.key==="Enter"&&createRoom()}/></div>
       {error&&<p style={s.error}>{error}</p>}
       <button style={s.btnPrimary} onClick={createRoom}>Create room</button>
     </div>
   );
 
+  // ── JOIN ──
   if (view === "join") return (
     <div style={s.page}>
       <button style={{...s.btnSmall,marginBottom:20}} onClick={()=>{ setJoinInput(""); setView(roomCode?"room":"home"); }}>← Back</button>
       <h2 style={s.h2}>Join a room</h2>
-      <div style={{marginBottom:12}}>
-        <label style={s.label}>Room code</label>
-        <input value={joinInput} onChange={e=>setJoinInput(e.target.value)} placeholder="ABC123" style={{textTransform:"uppercase",letterSpacing:3}}/>
-      </div>
-      <div style={{marginBottom:16}}>
-        <label style={s.label}>Your name</label>
-        <input value={joinName} onChange={e=>setJoinName(e.target.value)} placeholder="e.g. Alex" onKeyDown={e=>e.key==="Enter"&&joinRoom()}/>
-      </div>
+      <div style={{marginBottom:12}}><label style={s.label}>Room code</label><input value={joinInput} onChange={e=>setJoinInput(e.target.value)} placeholder="ABC123" style={{textTransform:"uppercase",letterSpacing:3}}/></div>
+      <div style={{marginBottom:16}}><label style={s.label}>Your name</label><input value={joinName} onChange={e=>setJoinName(e.target.value)} placeholder="e.g. Alex" onKeyDown={e=>e.key==="Enter"&&joinRoom()}/></div>
       {error&&<p style={s.error}>{error}</p>}
       <button style={s.btnPrimary} onClick={()=>joinRoom()}>Join room</button>
     </div>
   );
 
+  // ── CUSTOMIZE ──
   if (customizing !== null) {
     const f = FEATHER_COLORS[customTemp.feather];
     const e = EYE_COLORS[customTemp.eye];
     const sz = SIZE_OPTIONS[customTemp.size].scale;
-    const pill = active => ({ padding:"4px 10px", borderRadius:6, border: active?"1.5px solid #534AB7":"1px solid #ddd", background: active?"#EEEDFE":"#fff", color: active?"#534AB7":"#333", fontSize:12, cursor:"pointer" });
+    const accs = customTemp.accessories || [];
+    const toggleAcc = (val) => {
+      if (val === "none") { setCustomTemp(p => ({...p, accessories: []})); return; }
+      setCustomTemp(p => {
+        const cur = p.accessories || [];
+        return { ...p, accessories: cur.includes(val) ? cur.filter(a => a !== val) : [...cur, val] };
+      });
+    };
+    const pill = (active) => ({ padding:"4px 10px", borderRadius:6, border: active?"1.5px solid #534AB7":"1px solid #ddd", background: active?"#EEEDFE":"#fff", color: active?"#534AB7":"#333", fontSize:12, cursor:"pointer" });
     return (
       <div style={s.page}>
         <h2 style={{...s.h2,marginBottom:"0.75rem"}}>Customize your ostrich</h2>
         <div style={{width:130,margin:"0 auto 1.25rem"}}>
-          <OstrichSVG pct={15} feather={f} eyeColor={e.color} accessory={customTemp.accessory} legStyle={customTemp.legStyle} size={sz}/>
+          <OstrichSVG pct={15} feather={f} eyeColor={e.color} accessories={accs} legStyle={customTemp.legStyle} size={sz} name={myName}/>
         </div>
         {[
           {label:"Feather color", content: FEATHER_COLORS.map((o,i)=>(
@@ -584,7 +733,10 @@ function App() {
           {label:"Eye color", content: EYE_COLORS.map((o,i)=>(
             <button key={i} title={o.name} onClick={()=>setCustomTemp(p=>({...p,eye:i}))} style={{width:30,height:30,borderRadius:"50%",border:customTemp.eye===i?"2.5px solid #1a1a1a":"1px solid #ddd",background:o.color,cursor:"pointer",padding:0}}/>
           ))},
-          {label:"Accessory", content: ACCESSORIES.map(o=><button key={o.value} onClick={()=>setCustomTemp(p=>({...p,accessory:o.value}))} style={pill(customTemp.accessory===o.value)}>{o.name}</button>)},
+          {label:"Accessories (pick any)", content: ACCESSORIES.map(o=>(
+            <button key={o.value} onClick={()=>toggleAcc(o.value)}
+              style={pill(o.value==="none" ? accs.length===0 : accs.includes(o.value))}>{o.name}</button>
+          ))},
           {label:"Leg style", content: LEG_STYLES.map(o=><button key={o.value} onClick={()=>setCustomTemp(p=>({...p,legStyle:o.value}))} style={pill(customTemp.legStyle===o.value)}>{o.name}</button>)},
           {label:"Size", content: SIZE_OPTIONS.map((o,i)=><button key={i} onClick={()=>setCustomTemp(p=>({...p,size:i}))} style={pill(customTemp.size===i)}>{o.name}</button>)},
         ].map(sec=>(
@@ -603,7 +755,7 @@ function App() {
 
   // ── ROOM ──
   return (
-    <div style={{padding:"1rem",maxWidth:700,margin:"0 auto"}}>
+    <div style={{padding:"1rem",maxWidth:780,margin:"0 auto"}}>
       {confirmDelete && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100}}>
           <div style={{background:"#fff",borderRadius:12,padding:"1.5rem",maxWidth:320,width:"90%",textAlign:"center"}}>
@@ -618,20 +770,18 @@ function App() {
       )}
 
       {/* Header */}
-      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:"1.5rem",flexWrap:"wrap",gap:10}}>
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:"1rem",flexWrap:"wrap",gap:10}}>
         <div>
           {editingRoomName ? (
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-              <input value={roomNameDraft} onChange={e=>setRoomNameDraft(e.target.value)}
-                onKeyDown={e=>{ if(e.key==="Enter") saveRoomName(); if(e.key==="Escape") setEditingRoomName(false); }}
-                style={{fontSize:16,fontWeight:600,padding:"2px 8px",borderRadius:6,border:"1.5px solid #534AB7",width:180}} autoFocus/>
+              <input value={roomNameDraft} onChange={e=>setRoomNameDraft(e.target.value)} onKeyDown={e=>{ if(e.key==="Enter") saveRoomName(); if(e.key==="Escape") setEditingRoomName(false); }} style={{fontSize:16,fontWeight:600,padding:"2px 8px",borderRadius:6,border:"1.5px solid #534AB7",width:180}} autoFocus/>
               <button style={{...s.btnSmall,background:"#534AB7",color:"#fff",border:"none"}} onClick={saveRoomName}>Save</button>
               <button style={s.btnSmall} onClick={()=>setEditingRoomName(false)}>Cancel</button>
             </div>
           ) : (
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
               <h1 style={{fontSize:18,fontWeight:600,margin:0}}>{roomName || "Ostrich-O-Meter"}</h1>
-              {isAdmin && <button onClick={()=>{ setRoomNameDraft(roomName); setEditingRoomName(true); }} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:"#aaa",padding:0}} title="Edit room name">✏️</button>}
+              {isAdmin && <button onClick={()=>{ setRoomNameDraft(roomName); setEditingRoomName(true); }} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:"#aaa",padding:0}}>✏️</button>}
             </div>
           )}
           <p style={{fontSize:11,color:"#aaa",margin:0}}>Ostrich-O-Meter {isAdmin && <span style={{color:"#534AB7",fontWeight:500}}>· Admin</span>}</p>
@@ -656,45 +806,57 @@ function App() {
               <p style={{fontSize:24,fontWeight:600,margin:0,color:myLabel?.color}}>{me.pct}%</p>
               <p style={{fontSize:12,color:"#888",margin:"2px 0 0",fontStyle:"italic"}}>{myLabel?.label}</p>
             </div>
-            <button style={s.btnSmall} onClick={()=>{setCustomizing(myId);setCustomTemp({...DEFAULT_CUSTOMIZATION,...me.customization});}}>Customize</button>
+            <button style={s.btnSmall} onClick={()=>{setCustomizing(myId);setCustomTemp({...DEFAULT_CUSTOMIZATION,...me.customization,accessories:me.customization?.accessories||[]});}}>Customize</button>
           </div>
-          <input type="range" min={0} max={100} step={1} value={me.pct} onChange={e=>updatePct(Number(e.target.value))}/>
+          <input type="range" min={0} max={200} step={1} value={me.pct} onChange={e=>updatePct(Number(e.target.value))}/>
           <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#aaa",marginTop:4}}>
-            <span>Head high</span><span>Fully submerged</span>
+            <span>Head high</span><span style={{color:"#BA7517"}}>100%</span><span>💀 200%</span>
           </div>
         </div>
       )}
 
-      {/* Ostrich grid */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:"1.5rem"}}>
-        {memberList.map(member=>{
-          const f=FEATHER_COLORS[member.customization?.feather??0];
-          const e=EYE_COLORS[member.customization?.eye??0];
-          const acc=member.customization?.accessory??"none";
-          const leg=member.customization?.legStyle??"normal";
-          const sz=SIZE_OPTIONS[member.customization?.size??1].scale;
-          const lbl=getLabel(member.pct);
-          const isMe=member.id===myId;
-          return (
-            <div key={member.id} style={{background:"#fff",border:isMe?"2px solid #534AB7":"1px solid #e5e5e5",borderRadius:12,padding:"0.75rem",textAlign:"center",position:"relative"}}>
-              {isMe&&<span style={{position:"absolute",top:6,left:8,fontSize:10,color:"#534AB7",fontWeight:600}}>you</span>}
-              {(isMe||isAdmin)&&<button onClick={()=>removeMember(member.id)} style={{position:"absolute",top:4,right:6,background:"none",border:"none",cursor:"pointer",fontSize:16,color:"#bbb",padding:2,lineHeight:1}}>×</button>}
-              <div style={{height:120,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-                <div style={{width:100}}>
-                  <OstrichSVG pct={member.pct} feather={f} eyeColor={e.color} accessory={acc} legStyle={leg} size={sz*0.85}/>
+      {/* Island scene */}
+      <IslandScene members={members} myId={myId} onSelectMember={setSelectedMember} selectedMember={selectedMember}/>
+
+      {/* Selected member info + scoreboard */}
+      <div style={{display:"flex",gap:12,marginBottom:"1.5rem",flexWrap:"wrap"}}>
+        {/* Scoreboard */}
+        <div style={{flex:"1 1 200px",background:"#fff",borderRadius:12,border:"1px solid #e5e5e5",padding:"0.75rem",minWidth:180}}>
+          <p style={{fontSize:13,fontWeight:600,margin:"0 0 10px",color:"#555"}}>🏝️ Standings</p>
+          {memberList.length === 0 && <p style={{fontSize:12,color:"#ccc"}}>No one here yet</p>}
+          {memberList.sort((a,b)=>b.pct-a.pct).map(m => {
+            const lbl = getLabel(m.pct);
+            const isMe = m.id === myId;
+            const isSel = m.id === selectedMember;
+            return (
+              <div key={m.id} onClick={()=>setSelectedMember(m.id===selectedMember?null:m.id)}
+                style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"5px 8px",borderRadius:8,marginBottom:4,cursor:"pointer",background:isSel?"#f0effe":isMe?"#f8f7ff":"transparent",border:isSel?"1px solid #534AB7":"1px solid transparent"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  {(isMe||isAdmin) && <button onClick={e=>{e.stopPropagation();removeMember(m.id);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"#ddd",padding:0,lineHeight:1}}>×</button>}
+                  <span style={{fontSize:13,fontWeight:isMe?600:400}}>{m.name}{isMe?" (you)":""}</span>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <span style={{fontSize:13,fontWeight:600,color:lbl.color}}>{m.pct}%</span>
+                  <p style={{fontSize:9,color:"#aaa",margin:0,fontStyle:"italic"}}>{lbl.label}</p>
                 </div>
               </div>
-              <p style={{fontWeight:600,fontSize:13,margin:"4px 0 2px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{member.name}</p>
-              <p style={{fontSize:18,fontWeight:600,margin:"0 0 2px",color:lbl.color}}>{member.pct}%</p>
-              <p style={{fontSize:10,color:"#999",margin:0,fontStyle:"italic",lineHeight:1.3}}>{lbl.label}</p>
-            </div>
-          );
-        })}
-        <div onClick={()=>setView("join")} style={{border:"1px dashed #ccc",borderRadius:12,padding:"0.75rem",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:200,cursor:"pointer",color:"#bbb",gap:8}}>
-          <span style={{fontSize:28}}>+</span>
-          <p style={{fontSize:12,margin:0,color:"#aaa"}}>Add teammate</p>
-          <p style={{fontSize:10,margin:0,color:"#bbb"}}>Share code: <strong style={{color:"#888",letterSpacing:1}}>{roomCode}</strong></p>
+            );
+          })}
+          <div onClick={()=>setView("join")} style={{marginTop:8,padding:"6px 8px",borderRadius:8,border:"1px dashed #ddd",textAlign:"center",cursor:"pointer",fontSize:12,color:"#aaa"}}>+ Add teammate</div>
         </div>
+
+        {/* Selected ostrich detail */}
+        {selMember && (
+          <div style={{flex:"1 1 180px",background:"#fff",borderRadius:12,border:"1.5px solid #534AB7",padding:"0.75rem",minWidth:160,textAlign:"center"}}>
+            <div style={{width:100,margin:"0 auto"}}>
+              <OstrichSVG pct={selMember.pct} feather={FEATHER_COLORS[selMember.customization?.feather??0]} eyeColor={EYE_COLORS[selMember.customization?.eye??0].color} accessories={selMember.customization?.accessories??[]} legStyle={selMember.customization?.legStyle??"normal"} size={SIZE_OPTIONS[selMember.customization?.size??1].scale*0.85} name={selMember.name}/>
+            </div>
+            <p style={{fontWeight:600,fontSize:14,margin:"4px 0 2px"}}>{selMember.name}</p>
+            <p style={{fontSize:20,fontWeight:700,color:getLabel(selMember.pct).color,margin:"0 0 2px"}}>{selMember.pct}%</p>
+            <p style={{fontSize:11,color:"#888",fontStyle:"italic"}}>{getLabel(selMember.pct).label}</p>
+            <button style={{...s.btnSmall,marginTop:8,fontSize:11}} onClick={()=>setSelectedMember(null)}>Close</button>
+          </div>
+        )}
       </div>
 
       {/* Chat */}
@@ -704,9 +866,7 @@ function App() {
           <p style={{fontSize:11,color:"#aaa",margin:0}}>{messages.length} message{messages.length!==1?"s":""}</p>
         </div>
         <div className="chat-box">
-          {messages.length === 0 && (
-            <p style={{fontSize:13,color:"#ccc",textAlign:"center",marginTop:80}}>No messages yet — say something! 🦤</p>
-          )}
+          {messages.length === 0 && <p style={{fontSize:13,color:"#ccc",textAlign:"center",marginTop:60}}>No messages yet — say something! 🦤</p>}
           {messages.map(msg => {
             const isMe = msg.userId === myId;
             return (
@@ -718,11 +878,9 @@ function App() {
                   <div style={{display:"flex",alignItems:"baseline",gap:6,justifyContent:isMe?"flex-end":"flex-start",marginBottom:3}}>
                     <span style={{fontSize:11,fontWeight:600,color:isMe?"#534AB7":"#555"}}>{msg.name}</span>
                     <span style={{fontSize:10,color:"#ccc"}}>{formatTime(msg.ts)}</span>
-                    {(isMe||isAdmin) && <button onClick={()=>deleteMessage(msg.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#ddd",padding:0,lineHeight:1}} title="Delete">✕</button>}
+                    {(isMe||isAdmin)&&<button onClick={()=>deleteMessage(msg.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#ddd",padding:0,lineHeight:1}}>✕</button>}
                   </div>
-                  <div style={{background:isMe?"#534AB7":"#f5f5f3",color:isMe?"#fff":"#1a1a1a",borderRadius:isMe?"12px 12px 2px 12px":"12px 12px 12px 2px",padding:"7px 12px",fontSize:13,lineHeight:1.4,wordBreak:"break-word"}}>
-                    {msg.text}
-                  </div>
+                  <div style={{background:isMe?"#534AB7":"#f5f5f3",color:isMe?"#fff":"#1a1a1a",borderRadius:isMe?"12px 12px 2px 12px":"12px 12px 12px 2px",padding:"7px 12px",fontSize:13,lineHeight:1.4,wordBreak:"break-word"}}>{msg.text}</div>
                 </div>
               </div>
             );
@@ -730,13 +888,7 @@ function App() {
           <div ref={chatEndRef}/>
         </div>
         <div style={{padding:"10px 12px",borderTop:"1px solid #f0f0f0",display:"flex",gap:8}}>
-          <input
-            value={chatInput}
-            onChange={e=>setChatInput(e.target.value)}
-            onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-            placeholder="Type a message…"
-            style={{flex:1,padding:"8px 12px",borderRadius:20,border:"1px solid #e5e5e5",fontSize:13,outline:"none"}}
-          />
+          <input value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage();}}} placeholder="Type a message…" style={{flex:1,padding:"8px 12px",borderRadius:20,border:"1px solid #e5e5e5",fontSize:13,outline:"none"}}/>
           <button onClick={sendMessage} style={{padding:"8px 16px",borderRadius:20,border:"none",background:"#534AB7",color:"#fff",fontSize:13,fontWeight:500,cursor:"pointer"}}>Send</button>
         </div>
       </div>
