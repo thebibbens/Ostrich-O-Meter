@@ -117,47 +117,37 @@ function getEpitaph(name) {
   return EPITAPHS[idx];
 }
 
-// ── OSTRICH SVG ──────────────────────────────────────────────────
-function OstrichSVG({ pct, feather, eyeColor, accessories = [], legStyle, size, name }) {
+// ── OSTRICH GROUP (renders directly into any SVG, no foreignObject) ──
+function OstrichGroup({ pct, feather, eyeColor, accessories = [], legStyle, size, ox, oy }) {
   const sc = size;
   const pct100 = Math.min(pct, 100);
-  const pctOver = Math.max(0, pct - 100); // 0-100 extra
+  const pctOver = Math.max(0, pct - 100);
   const buried100 = pct100 / 100;
-  const buriedBody = pctOver / 100; // how much body sinks
-  const W = 120;
+  const buriedBody = pctOver / 100;
 
-  // At 200% show tombstone
   if (pct >= 200) {
+    // Tombstone — oy is the ground level, stone sits above it
     return (
-      <svg width="100%" viewBox="0 0 120 200" style={{overflow:"visible",display:"block"}}>
-        {/* Dirt mound */}
-        <ellipse cx={60} cy={172} rx={40} ry={10} fill="#a07840" opacity="0.5"/>
-        <ellipse cx={60} cy={170} rx={36} ry={8} fill="#b8945e" opacity="0.6"/>
-        {/* Tombstone body */}
-        <rect x={34} y={95} width={52} height={65} rx={5} fill="#8a8a8a"/>
-        <ellipse cx={60} cy={95} rx={26} ry={18} fill="#8a8a8a"/>
-        {/* Tombstone face (lighter) */}
-        <rect x={37} y={97} width={46} height={61} rx={3} fill="#b0b0b0"/>
-        <ellipse cx={60} cy={95} rx={23} ry={15} fill="#b0b0b0"/>
-        {/* Stone texture */}
-        <ellipse cx={48} cy={88} rx={6} ry={4} fill="#c8c8c8" opacity="0.4"/>
-        {/* Cross */}
-        <rect x={56} y={105} width={8} height={28} rx={2} fill="#707070"/>
-        <rect x={48} y={113} width={24} height={7} rx={2} fill="#707070"/>
-        {/* RIP text — large and readable */}
-        <text x={60} y={150} textAnchor="middle" fontSize={14} fontWeight="bold" fill="#505050">RIP</text>
-      </svg>
+      <g transform={`translate(${ox - 60},${oy - 140})`}>
+        <ellipse cx={60} cy={145} rx={40} ry={10} fill="#a07840" opacity="0.5"/>
+        <ellipse cx={60} cy={142} rx={36} ry={8} fill="#b8945e" opacity="0.6"/>
+        <rect x={34} y={55} width={52} height={78} rx={5} fill="#8a8a8a"/>
+        <ellipse cx={60} cy={55} rx={26} ry={18} fill="#8a8a8a"/>
+        <rect x={37} y={57} width={46} height={74} rx={3} fill="#b0b0b0"/>
+        <ellipse cx={60} cy={55} rx={23} ry={15} fill="#b0b0b0"/>
+        <ellipse cx={48} cy={48} rx={6} ry={4} fill="#c8c8c8" opacity="0.4"/>
+        <rect x={56} y={68} width={8} height={28} rx={2} fill="#707070"/>
+        <rect x={48} y={76} width={24} height={7} rx={2} fill="#707070"/>
+        <text x={60} y={115} textAnchor="middle" fontSize={16} fontWeight="bold" fill="#505050">RIP</text>
+      </g>
     );
   }
 
   const groundY = 170 * sc;
   const bx = 58*sc, by = 120*sc, brx = 34*sc, bry = 30*sc;
-
-  // Body sinks when pct > 100 — whole bird moves down together
   const bodySink = buriedBody * 40 * sc;
-
   const neckBaseX = bx - 10*sc;
-  const neckBaseY = by - bry + 4*sc + bodySink;  // sink with body
+  const neckBaseY = by - bry + 4*sc + bodySink;
   const neckLen = 60*sc;
   const angleStart = -80*(Math.PI/180), angleEnd = -200*(Math.PI/180);
   const neckAngle = angleStart + buried100*(angleEnd - angleStart);
@@ -173,8 +163,8 @@ function OstrichSVG({ pct, feather, eyeColor, accessories = [], legStyle, size, 
   const nx3=neckTipX-Math.cos(perp)*(neckW*0.7), ny3=neckTipY-Math.sin(perp)*(neckW*0.7);
   const nx4=neckTipX+Math.cos(perp)*(neckW*0.7), ny4=neckTipY+Math.sin(perp)*(neckW*0.7);
   const patchX=neckBaseX+Math.cos(neckAngle)*10*sc, patchY=neckBaseY+Math.sin(neckAngle)*10*sc;
-  const ndx=Math.cos(neckAngle), ndy=Math.sin(neckAngle);
-  const faceDx=ndy, faceDy=-ndx;
+  const ndy=Math.sin(neckAngle);
+  const faceDx=ndy, faceDy=-Math.cos(neckAngle);
   const headUpX=0, headUpY=-1;
   const eyeX=headX+faceDx*headR*0.3+headUpX*headR*0.35;
   const eyeY=headY+faceDy*headR*0.3+headUpY*headR*0.35;
@@ -193,46 +183,32 @@ function OstrichSVG({ pct, feather, eyeColor, accessories = [], legStyle, size, 
   const wingHX=bx+8*sc, wingHY=by-8*sc+bodySink;
   const sandDepth=Math.max(0,(buried100-0.25)/0.75)*28*sc;
   const holeVisible=buried100>0.25;
-  const svgH=Math.max(leg1BotY+18, groundY+18);
-
-  // Body position adjusted for sinking
   const bodyY = by + bodySink;
-  const bodyNeckBaseY = neckBaseY;  // already includes bodySink
-
+  const bodyNeckBaseY = neckBaseY;
   const hasAcc = (v) => accessories.includes(v);
 
-  return (
-    <svg width="100%" viewBox={`0 0 ${W*sc} ${svgH}`} style={{overflow:"visible",display:"block"}}>
-      <ellipse cx={bx} cy={groundY+4} rx={42*sc} ry={7*sc} fill="#c8a96e" opacity="0.3"/>
-      <rect x={0} y={groundY} width={W*sc} height={14*sc} fill="#c8a96e" opacity="0.18" rx={3}/>
+  // Translate so groundY in ostrich-space aligns with oy in parent SVG,
+  // and bx (body centre-x) aligns with ox
+  const tx = ox - bx;
+  const ty = oy - groundY;
 
-      {/* Tail */}
+  return (
+    <g transform={`translate(${tx},${ty})`}>
       {[0,1,2].map(i=><ellipse key={i} cx={tailX+i*4*sc} cy={tailY-i*3*sc} rx={12*sc} ry={7*sc} fill={feather.wing} transform={`rotate(${-30+i*15},${tailX+i*4*sc},${tailY-i*3*sc})`} opacity={0.95-i*0.1}/>)}
       {[0,1,2].map(i=><ellipse key={i} cx={tailX+i*4*sc+Math.cos((-30+i*15)*Math.PI/180)*8*sc} cy={tailY-i*3*sc+Math.sin((-30+i*15)*Math.PI/180)*3*sc} rx={5*sc} ry={3.5*sc} fill={feather.body} transform={`rotate(${-30+i*15},${tailX+i*4*sc},${tailY-i*3*sc})`} opacity={0.4}/>)}
-
-      {/* Legs */}
       <line x1={leg1X} y1={legTopY} x2={leg1X-3*sc} y2={leg1BotY} stroke="#E88070" strokeWidth={legW} strokeLinecap="round"/>
       <line x1={leg2X} y1={legTopY} x2={leg2X+2*sc} y2={leg2BotY} stroke="#E88070" strokeWidth={legW} strokeLinecap="round"/>
       {[[-10*sc,4*sc],[-3*sc,6*sc],[4*sc,5*sc]].map(([dx,dy],i)=><line key={i} x1={leg1X-3*sc} y1={leg1BotY} x2={leg1X-3*sc+dx} y2={leg1BotY+dy} stroke="#E88070" strokeWidth={legW*0.7} strokeLinecap="round"/>)}
       {[[-6*sc,5*sc],[2*sc,7*sc],[9*sc,4*sc]].map(([dx,dy],i)=><line key={i} x1={leg2X+2*sc} y1={leg2BotY} x2={leg2X+2*sc+dx} y2={leg2BotY+dy} stroke="#E88070" strokeWidth={legW*0.7} strokeLinecap="round"/>)}
-
-      {/* Flip flops under feet */}
       {hasAcc("flipflops")&&<g>
         <ellipse cx={leg1X-10*sc} cy={leg1BotY+5*sc} rx={9*sc} ry={3.5*sc} fill="#FF6B6B" opacity="0.9"/>
         <ellipse cx={leg2X+4*sc} cy={leg2BotY+5*sc} rx={9*sc} ry={3.5*sc} fill="#4ECDC4" opacity="0.9"/>
         <line x1={leg1X-10*sc} y1={leg1BotY+2*sc} x2={leg1X-5*sc} y2={leg1BotY-1*sc} stroke="#FF6B6B" strokeWidth={2*sc}/>
         <line x1={leg2X+4*sc} y1={leg2BotY+2*sc} x2={leg2X+9*sc} y2={leg2BotY-1*sc} stroke="#4ECDC4" strokeWidth={2*sc}/>
       </g>}
-
-      {/* Body */}
       <ellipse cx={bx} cy={bodyY} rx={brx} ry={bry} fill={feather.body}/>
       <ellipse cx={bx-8*sc} cy={bodyY-10*sc} rx={14*sc} ry={8*sc} fill="white" opacity="0.08"/>
       <ellipse cx={wingHX} cy={wingHY} rx={18*sc} ry={10*sc} fill={feather.wing} opacity="0.25" transform={`rotate(-15,${wingHX},${wingHY})`}/>
-
-      {/* Sand cover for body sinking */}
-      {pct > 100 && <rect x={0} y={groundY} width={W*sc} height={bodySink+10} fill="#c8a96e" opacity="0.7"/>}
-
-      {/* Coconut bra on chest */}
       {hasAcc("coconutbra")&&<g>
         <ellipse cx={bx-11*sc} cy={bodyY-6*sc} rx={9*sc} ry={7*sc} fill="#7a5230"/>
         <ellipse cx={bx+9*sc} cy={bodyY-6*sc} rx={9*sc} ry={7*sc} fill="#7a5230"/>
@@ -241,20 +217,14 @@ function OstrichSVG({ pct, feather, eyeColor, accessories = [], legStyle, size, 
         <line x1={bx-11*sc} y1={bodyY-12*sc} x2={neckBaseX-2*sc} y2={bodyNeckBaseY+8*sc} stroke="#7a5230" strokeWidth={2*sc}/>
         <line x1={bx+9*sc} y1={bodyY-12*sc} x2={neckBaseX+4*sc} y2={bodyNeckBaseY+8*sc} stroke="#7a5230" strokeWidth={2*sc}/>
       </g>}
-
-      {/* Neck */}
       <polygon points={`${nx1},${ny1} ${nx2},${ny2} ${nx3},${ny3} ${nx4},${ny4}`} fill={feather.neck}/>
       <ellipse cx={(nx1+nx4)/2} cy={(ny1+ny4)/2} rx={neckW*0.4} ry={neckLen*0.3} fill="white" opacity="0.12" transform={`rotate(${neckAngle*180/Math.PI},${(nx1+nx4)/2},${(ny1+ny4)/2})`}/>
       <ellipse cx={patchX} cy={patchY} rx={8*sc} ry={6*sc} fill={feather.wing} opacity="0.7"/>
-
-      {/* Bow tie at neck/body junction */}
       {hasAcc("bowtie")&&<g>
         <polygon points={`${neckBaseX-9*sc},${bodyNeckBaseY+2*sc} ${neckBaseX},${bodyNeckBaseY+8*sc} ${neckBaseX-9*sc},${bodyNeckBaseY+14*sc}`} fill="#D4537E"/>
         <polygon points={`${neckBaseX+9*sc},${bodyNeckBaseY+2*sc} ${neckBaseX},${bodyNeckBaseY+8*sc} ${neckBaseX+9*sc},${bodyNeckBaseY+14*sc}`} fill="#D4537E"/>
         <circle cx={neckBaseX} cy={bodyNeckBaseY+8*sc} r={3*sc} fill="#993556"/>
       </g>}
-
-      {/* Lei around neck base */}
       {hasAcc("lei")&&<g>
         {[0,1,2,3,4,5,6,7].map(i=>{
           const a=(i/8)*Math.PI*2;
@@ -265,19 +235,12 @@ function OstrichSVG({ pct, feather, eyeColor, accessories = [], legStyle, size, 
         })}
         <ellipse cx={neckBaseX} cy={bodyNeckBaseY+16*sc} rx={11*sc} ry={4*sc} fill="none" stroke="#2d8a4e" strokeWidth={1.5*sc} opacity="0.5"/>
       </g>}
-
-      {/* Head */}
       {!headBuried && (
         <g>
           <circle cx={headX} cy={headY} r={headR} fill={feather.neck}/>
           <ellipse cx={headX-headR*0.2} cy={headY-headR*0.3} rx={headR*0.35} ry={headR*0.25} fill="white" opacity="0.15"/>
-
-          {/* Beak */}
-          <polygon points={`${beakB1X},${beakB1Y} ${beakTipX+faceDy*2*sc},${beakTipY-faceDx*2*sc} ${beakB2X},${beakB2Y}`} fill="#c86020"/>
+          <polygon points={`${beakB1X},${beakB1Y} ${beakTipX+faceDx*2*sc},${beakTipY+faceDy*2*sc} ${beakB2X},${beakB2Y}`} fill="#c86020"/>
           <polygon points={`${beakB1X},${beakB1Y} ${beakTipX},${beakTipY} ${beakB2X-headUpX*2*sc},${beakB2Y-headUpY*2*sc}`} fill={feather.beak}/>
-          <line x1={beakBaseX} y1={beakBaseY} x2={beakTipX} y2={beakTipY} stroke="#c86020" strokeWidth={1} opacity="0.5"/>
-
-          {/* Eye */}
           <circle cx={eyeX} cy={eyeY} r={6*sc} fill="white"/>
           <circle cx={eyeX+0.5*sc} cy={eyeY+0.5*sc} r={4*sc} fill={eyeColor}/>
           <circle cx={eyeX+0.8*sc} cy={eyeY+0.8*sc} r={2*sc} fill="#1a1a1a"/>
@@ -288,55 +251,50 @@ function OstrichSVG({ pct, feather, eyeColor, accessories = [], legStyle, size, 
             const lx2=lx1+Math.cos(la-0.3)*5*sc, ly2=ly1+Math.sin(la-0.3)*5*sc;
             return <line key={i} x1={lx1} y1={ly1} x2={lx2} y2={ly2} stroke="#1a1a1a" strokeWidth={1.2*sc} strokeLinecap="round"/>;
           })}
-
-          {/* Sunglasses: single wide lens + earpiece */}
           {hasAcc("sunglasses")&&<g>
             <rect x={eyeX-9*sc} y={eyeY-5*sc} width={16*sc} height={9*sc} rx={4} fill="#1a1a1a" opacity="0.85"/>
             <line x1={eyeX+7*sc} y1={eyeY-1*sc} x2={headX+headR-1} y2={eyeY+2*sc} stroke="#1a1a1a" strokeWidth={1.5*sc} strokeLinecap="round"/>
             <line x1={eyeX-9*sc} y1={eyeY-1*sc} x2={headX-headR+2} y2={eyeY+3*sc} stroke="#1a1a1a" strokeWidth={1.5*sc} strokeLinecap="round"/>
           </g>}
-
-          {/* Top hat */}
           {hasAcc("tophat")&&<g>
             <rect x={headX-11*sc} y={headY-headR-22*sc} width={22*sc} height={18*sc} rx={2} fill="#1a1a1a"/>
             <rect x={headX-15*sc} y={headY-headR-5*sc} width={30*sc} height={5*sc} rx={2} fill="#1a1a1a"/>
             <rect x={headX-10*sc} y={headY-headR-22*sc} width={22*sc} height={3*sc} rx={1} fill="#D4537E" opacity="0.8"/>
           </g>}
-
-          {/* Party hat */}
           {hasAcc("partyhat")&&<g>
             <polygon points={`${headX-12*sc},${headY-headR+2} ${headX+12*sc},${headY-headR+2} ${headX+2*sc},${headY-headR-26*sc}`} fill="#D4537E"/>
-            <polygon points={`${headX-12*sc},${headY-headR+2} ${headX+12*sc},${headY-headR+2} ${headX+2*sc},${headY-headR-26*sc}`} fill="none" stroke="#FAC775" strokeWidth={1} strokeDasharray="3,3"/>
             <circle cx={headX+2*sc} cy={headY-headR-26*sc} r={4*sc} fill="#FAC775"/>
           </g>}
-
-          {/* Crown */}
           {hasAcc("crown")&&<g>
             <polygon points={`${headX-13*sc},${headY-headR} ${headX-13*sc},${headY-headR-14*sc} ${headX-6*sc},${headY-headR-8*sc} ${headX},${headY-headR-16*sc} ${headX+6*sc},${headY-headR-8*sc} ${headX+13*sc},${headY-headR-14*sc} ${headX+13*sc},${headY-headR}`} fill="#EF9F27" stroke="#BA7517" strokeWidth={0.5}/>
             {[-8,0,8].map((dx,i)=><circle key={i} cx={headX+dx*sc} cy={headY-headR-2*sc} r={2.5*sc} fill="#D85A30"/>)}
           </g>}
-
-          {/* Wide brim hat */}
           {hasAcc("widebrimhat")&&<g>
             <ellipse cx={headX+2*sc} cy={headY-headR+2*sc} rx={28*sc} ry={7*sc} fill="#D4A853"/>
             <ellipse cx={headX+2*sc} cy={headY-headR-8*sc} rx={14*sc} ry={11*sc} fill="#D4A853"/>
             <ellipse cx={headX+2*sc} cy={headY-headR+2*sc} rx={14*sc} ry={5*sc} fill="#C49040"/>
-            <ellipse cx={headX+2*sc} cy={headY-headR-2*sc} rx={14*sc} ry={4*sc} fill="none" stroke="#E8762A" strokeWidth={3*sc}/>
-            {[-1,0,1].map(i=><line key={i} x1={headX+2*sc-10*sc} y1={headY-headR-8*sc+i*4*sc} x2={headX+2*sc+10*sc} y2={headY-headR-8*sc+i*4*sc} stroke="#B8832A" strokeWidth={0.5*sc} opacity="0.5"/>)}
           </g>}
-
-          {/* Snorkel: mask over eye + tube arcing from side of head */}
           {hasAcc("snorkel")&&<g>
             <rect x={eyeX-9*sc} y={eyeY-6*sc} width={16*sc} height={11*sc} rx={5} fill="#4ECDC4" opacity="0.6" stroke="#2B9E9E" strokeWidth={1.5*sc}/>
-            {/* tube from side of head going up */}
             <path d={`M ${headX-Math.cos(neckAngle)*headR*0.7} ${headY-Math.sin(neckAngle)*headR*0.3} C ${headX-headR*1.5} ${headY-headR*1.5} ${headX-headR} ${headY-headR*3} ${headX-headR*0.5} ${headY-headR*3.5}`} fill="none" stroke="#FF6B6B" strokeWidth={3*sc} strokeLinecap="round"/>
             <circle cx={headX-headR*0.5} cy={headY-headR*3.5} r={3*sc} fill="#FF6B6B"/>
           </g>}
         </g>
       )}
-
-      {/* Sand hole */}
       {holeVisible&&<><ellipse cx={neckTipX} cy={groundY} rx={16*sc*Math.min(1,(buried100-0.25)/0.5)} ry={5*sc*Math.min(1,(buried100-0.25)/0.5)} fill="#b8945e" opacity="0.9"/>{buried100>0.5&&<ellipse cx={neckTipX} cy={groundY+2} rx={18*sc} ry={sandDepth*0.5} fill="#c8a96e" opacity="0.85"/>}</>}
+    </g>
+  );
+}
+
+// ── OSTRICH SVG wrapper (used in detail card + customize preview) ──
+function OstrichSVG({ pct, feather, eyeColor, accessories = [], legStyle, size, name }) {
+  const sc = size;
+  const groundY = 170 * sc;
+  const svgH = groundY + 30;
+  // bx centres the body; ox=60 centres in a 120px-wide viewBox
+  return (
+    <svg width="100%" viewBox={`0 0 120 ${svgH}`} style={{overflow:"visible",display:"block"}}>
+      <OstrichGroup pct={pct} feather={feather} eyeColor={eyeColor} accessories={accessories} legStyle={legStyle} size={size} name={name} ox={58*sc} oy={groundY}/>
     </svg>
   );
 }
@@ -528,21 +486,13 @@ function IslandScene({ members, myId, onSelectMember, selectedMember }) {
           const accs = member.customization?.accessories ?? [];
           const leg = member.customization?.legStyle ?? "normal";
           const sz = SIZE_OPTIONS[member.customization?.size ?? 1].scale * 0.7;
-          const ostW = 130;
-          const ostH = 200; // tall enough: ~140px body+legs + 60px for upright neck
           const isMe = member.id === myId;
           const isSelected = selectedMember === member.id;
-          // Anchor: foreignObject bottom sits at feetY, so top is feetY - ostH
-          const foTop = pos.feetY - ostH;
-          const nameY = pos.feetY + 14;
+          const nameY = pos.feetY + 16;
           return (
             <g key={member.id} onClick={() => onSelectMember(member.id === selectedMember ? null : member.id)} style={{cursor:"pointer"}}>
-              {(isSelected || isMe) && <ellipse cx={pos.x} cy={pos.feetY + 4} rx={46} ry={7} fill={isMe?"#534AB7":"#FFD93D"} opacity="0.3"/>}
-              <foreignObject x={pos.x - ostW/2} y={foTop} width={ostW} height={ostH}>
-                <div xmlns="http://www.w3.org/1999/xhtml" style={{width:ostW,height:ostH}}>
-                  <OstrichSVG pct={member.pct} feather={f} eyeColor={e.color} accessories={accs} legStyle={leg} size={sz} name={member.name}/>
-                </div>
-              </foreignObject>
+              {(isSelected || isMe) && <ellipse cx={pos.x} cy={pos.feetY + 4} rx={40} ry={7} fill={isMe?"#534AB7":"#FFD93D"} opacity="0.3"/>}
+              <OstrichGroup pct={member.pct} feather={f} eyeColor={e.color} accessories={accs} legStyle={leg} size={sz} ox={pos.x} oy={pos.feetY}/>
               <text x={pos.x} y={nameY} textAnchor="middle" fontSize={10} fontWeight={isMe?"700":"500"} fill={isMe?"#534AB7":"#444"}>
                 {member.name}
               </text>
