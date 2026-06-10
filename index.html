@@ -345,52 +345,63 @@ function OstrichSVG({ pct, feather, eyeColor, accessories = [], legStyle, size, 
 function IslandScene({ members, myId, onSelectMember, selectedMember }) {
   const memberList = Object.values(members);
   const count = memberList.length;
-  const islandW = Math.max(640, 260 + count * 180);
-  const islandH = 300;
-  const islandCX = islandW / 2;
-  const islandCY = 220;
-  const islandRX = islandW * 0.41;
-  const islandRY = 60;
 
-  // Each ostrich gets a fixed slot width; positions stay well inside the sand
-  // Palm trees occupy ~15% from each edge, so ostriches span the middle 60%
+  // Island grows with member count
+  const islandW = Math.max(700, 300 + count * 190);
+  const islandH = 420; // tall enough for ostriches above + sand below
+  const islandCX = islandW / 2;
+  // Sand ellipse center — sits in lower half of the scene
+  const sandCY = 310;
+  const islandRX = islandW * 0.40;
+  const islandRY = 62;
+
+  // The visible top of the sand ellipse — this is where feet stand
+  const sandSurface = sandCY - islandRY + 10; // ~top of sand, ~258
+
+  // Ostriches span the usable sand width (between palm trees)
+  // Palm trees are at ~72% from center on each side
+  const palmZone = islandRX * 0.68; // palm tree x offset from center
+  const usableLeft = islandCX - palmZone * 0.80;
+  const usableRight = islandCX + palmZone * 0.80;
+  const usableW = usableRight - usableLeft;
+
   const getPos = (i, total) => {
-    const margin = islandRX * 0.22; // keep away from palm tree zones
-    const usableW = islandRX * 2 - margin * 2;
     const slotW = total > 0 ? usableW / total : usableW;
-    const baseX = (islandCX - islandRX + margin) + slotW * i + slotW * 0.5;
-    const offY = ((i * 37 + 13) % 20) - 10;
-    return { x: baseX, y: islandCY - 40 + offY };
+    const baseX = usableLeft + slotW * i + slotW * 0.5;
+    // feet sit ON the sand surface
+    const feetY = sandSurface + 8;
+    const offY = ((i * 37 + 13) % 16) - 8; // tiny vertical wobble
+    return { x: baseX, feetY: feetY + offY };
   };
 
   return (
     <div style={{width:"100%",overflowX:"auto",marginBottom:"1.5rem"}}>
-      <svg width={islandW} height={islandH + 30} viewBox={`0 0 ${islandW} ${islandH + 30}`} style={{display:"block",margin:"0 auto",maxWidth:"100%"}}>
+      <svg width={islandW} height={islandH} viewBox={`0 0 ${islandW} ${islandH}`} style={{display:"block",margin:"0 auto",maxWidth:"100%"}}>
         {/* Ocean */}
-        <rect x={0} y={0} width={islandW} height={islandH+30} fill="#64B5F6" rx={16}/>
+        <rect x={0} y={0} width={islandW} height={islandH} fill="#64B5F6" rx={16}/>
         {/* Ocean waves */}
         {[0,1,2,3].map(i=>(
-          <ellipse key={i} cx={islandW*0.15+i*islandW*0.22} cy={islandH*0.25+i*8} rx={islandW*0.12} ry={8} fill="#90CAF9" opacity="0.4"/>
+          <ellipse key={i} cx={islandW*0.15+i*islandW*0.22} cy={80+i*14} rx={islandW*0.12} ry={9} fill="#90CAF9" opacity="0.4"/>
         ))}
 
         {/* Island sand */}
-        <ellipse cx={islandCX} cy={islandCY+10} rx={islandRX} ry={islandRY} fill="#F5DEB3"/>
-        <ellipse cx={islandCX} cy={islandCY+5} rx={islandRX*0.95} ry={islandRY*0.8} fill="#EDD8A0"/>
+        <ellipse cx={islandCX} cy={sandCY+10} rx={islandRX} ry={islandRY} fill="#F5DEB3"/>
+        <ellipse cx={islandCX} cy={sandCY+5} rx={islandRX*0.95} ry={islandRY*0.8} fill="#EDD8A0"/>
         {/* Sand texture dots */}
         {[...Array(12)].map((_,i)=>(
-          <circle key={i} cx={islandCX-islandRX*0.7+i*islandRX*0.13} cy={islandCY+12+(i%3)*6} r={2} fill="#D4A853" opacity="0.3"/>
+          <circle key={i} cx={islandCX-islandRX*0.7+i*islandRX*0.13} cy={sandCY+18+(i%3)*6} r={2} fill="#D4A853" opacity="0.3"/>
         ))}
 
-        {/* Starfish */}
-        <text x={islandCX-islandRX*0.6} y={islandCY+28} fontSize={14} opacity="0.7">⭐</text>
-        <text x={islandCX+islandRX*0.5} y={islandCY+32} fontSize={12} opacity="0.6">🐚</text>
+        {/* Starfish / shells */}
+        <text x={islandCX-islandRX*0.55} y={sandCY+34} fontSize={14} opacity="0.7">⭐</text>
+        <text x={islandCX+islandRX*0.48} y={sandCY+38} fontSize={12} opacity="0.6">🐚</text>
 
         {/* Palm tree 1 (left) — curved trunk with fronds */}
         {(() => {
           const tx = islandCX - islandRX * 0.72;
-          const ty = islandCY + 10;
+          const ty = sandCY + 10;
           const topX = islandCX - islandRX * 0.68;
-          const topY = islandCY - 90;
+          const topY = sandCY - 95;
           // Trunk segments (slightly curved, widening at base)
           const trunkPath = `M ${tx} ${ty} C ${tx+4} ${ty-30} ${topX+6} ${topY+50} ${topX} ${topY}`;
           const fronds = [
@@ -453,9 +464,9 @@ function IslandScene({ members, myId, onSelectMember, selectedMember }) {
         {/* Palm tree 2 (right) if island wide enough */}
         {islandW > 450 && (() => {
           const tx = islandCX + islandRX * 0.68;
-          const ty = islandCY + 8;
+          const ty = sandCY + 8;
           const topX = islandCX + islandRX * 0.63;
-          const topY = islandCY - 82;
+          const topY = sandCY - 87;
           const trunkPath = `M ${tx} ${ty} C ${tx-3} ${ty-28} ${topX-5} ${topY+45} ${topX} ${topY}`;
           const fronds = [
             { angle: -40,  len: 52, droop: 18 },
@@ -517,21 +528,21 @@ function IslandScene({ members, myId, onSelectMember, selectedMember }) {
           const accs = member.customization?.accessories ?? [];
           const leg = member.customization?.legStyle ?? "normal";
           const sz = SIZE_OPTIONS[member.customization?.size ?? 1].scale * 0.7;
-          const ostW = 120;  // wider so nothing clips
-          const ostH = 180;  // taller to fit neck-up ostriches fully
+          const ostW = 130;
+          const ostH = 200; // tall enough: ~140px body+legs + 60px for upright neck
           const isMe = member.id === myId;
           const isSelected = selectedMember === member.id;
-          // Name sits 8px below the foreignObject bottom
-          const nameY = pos.y - ostH * 0.15 + ostH + 10;
+          // Anchor: foreignObject bottom sits at feetY, so top is feetY - ostH
+          const foTop = pos.feetY - ostH;
+          const nameY = pos.feetY + 14;
           return (
             <g key={member.id} onClick={() => onSelectMember(member.id === selectedMember ? null : member.id)} style={{cursor:"pointer"}}>
-              {(isSelected || isMe) && <ellipse cx={pos.x} cy={nameY - 12} rx={ostW*0.42} ry={7} fill={isMe?"#534AB7":"#FFD93D"} opacity="0.3"/>}
-              <foreignObject x={pos.x - ostW/2} y={pos.y - ostH*0.15} width={ostW} height={ostH}>
+              {(isSelected || isMe) && <ellipse cx={pos.x} cy={pos.feetY + 4} rx={46} ry={7} fill={isMe?"#534AB7":"#FFD93D"} opacity="0.3"/>}
+              <foreignObject x={pos.x - ostW/2} y={foTop} width={ostW} height={ostH}>
                 <div xmlns="http://www.w3.org/1999/xhtml" style={{width:ostW,height:ostH}}>
                   <OstrichSVG pct={member.pct} feather={f} eyeColor={e.color} accessories={accs} legStyle={leg} size={sz} name={member.name}/>
                 </div>
               </foreignObject>
-              {/* Name label — anchored below foreignObject bottom */}
               <text x={pos.x} y={nameY} textAnchor="middle" fontSize={10} fontWeight={isMe?"700":"500"} fill={isMe?"#534AB7":"#444"}>
                 {member.name}
               </text>
@@ -540,7 +551,7 @@ function IslandScene({ members, myId, onSelectMember, selectedMember }) {
         })}
 
         {/* Add teammate prompt if empty */}
-        {count === 0 && <text x={islandCX} y={islandCY} textAnchor="middle" fontSize={13} fill="#aaa">No ostriches yet!</text>}
+        {count === 0 && <text x={islandCX} y={sandCY} textAnchor="middle" fontSize={13} fill="#aaa">No ostriches yet!</text>}
       </svg>
     </div>
   );
